@@ -1,4 +1,4 @@
-import { OrbitControls } from '@react-three/drei';
+import { Bounds, OrbitControls } from '@react-three/drei';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { BoxGeometry, Color, ExtrudeGeometry, InstancedMesh, Matrix4, ShapeGeometry } from 'three';
@@ -122,9 +122,12 @@ export default function Scene({ result, rooms, selected, onSelect }: Props) {
         <color attach="background" args={['#eef0ee']} />
         <hemisphereLight args={['#ffffff', '#9aa1a7', 1.2]} />
         <directionalLight position={[cx + size, size * 1.6, cz + size * 0.6]} intensity={1.5} />
-        {rooms.map((r) => (
-          <RoomBase key={r.id} room={r} />
-        ))}
+        {/* enquadra o piso em qualquer proporção de tela e ao redimensionar */}
+        <Bounds fit clip observe margin={1.05}>
+          {rooms.map((r) => (
+            <RoomBase key={r.id} room={r} />
+          ))}
+        </Bounds>
         {many && <FullTiles pieces={full} selected={selected} onSelect={onSelect} />}
         {meshes.map((p) => (
           <PieceMesh key={p.n} piece={p} selected={p.n === selected} onSelect={onSelect} />

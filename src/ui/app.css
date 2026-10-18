@@ -597,6 +597,15 @@ select {
   margin-bottom: 4px;
 }
 
+.canvas-3d {
+  background: #eef0ee;
+  background-image: none;
+}
+
+.canvas-3d canvas {
+  touch-action: none;
+}
+
 .canvas-plain {
   background: var(--prancheta);
   background-image: none;

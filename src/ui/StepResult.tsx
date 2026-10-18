@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { Point } from '../geometry/types';
 import CutTable from '../report/CutTable';
 import Compare from '../report/Compare';
@@ -25,17 +25,14 @@ const TABS: { id: ResultTab; label: string }[] = [
 
 const MANY_PIECES = 20000;
 
-interface Props {
-  /** Visualização 3D (entra no Task 6). */
-  render3d?: (p: { result: LayoutResult; selected: number | null; onSelect(n: number | null): void }) => React.ReactNode;
-}
+const Scene = lazy(() => import('../viewer3d/Scene'));
 
-export default function StepResult({ render3d }: Props) {
+export default function StepResult() {
   const project = useProject((s) => s.project);
   const result = useProject((s) => s.result);
   const { setResult, setLayout, setStep } = useProject.getState();
   const rooms = useMemo(() => roomsInCm(project), [project]);
-  const [tab, setTab] = useState<ResultTab>(render3d ? '3d' : '2d');
+  const [tab, setTab] = useState<ResultTab>('3d');
   const [selected, setSelected] = useState<number | null>(null);
   const [preview, setPreview] = useState<LayoutResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +81,6 @@ export default function StepResult({ render3d }: Props) {
               key={t.id}
               role="tab"
               aria-selected={tab === t.id}
-              disabled={t.id === '3d' && !render3d}
               onClick={() => setTab(t.id)}
             >
               {t.label}
@@ -96,8 +92,10 @@ export default function StepResult({ render3d }: Props) {
             <div className="center-msg error">{error}</div>
           ) : !shown ? (
             <div className="center-msg">Montando o quebra-cabeça…</div>
-          ) : tab === '3d' && render3d ? (
-            render3d({ result: shown, selected, onSelect: setSelected })
+          ) : tab === '3d' ? (
+            <Suspense fallback={<div className="center-msg">Carregando o 3D…</div>}>
+              <Scene result={shown} rooms={rooms} selected={selected} onSelect={setSelected} />
+            </Suspense>
           ) : tab === '2d' ? (
             <Plan2D
               result={shown}

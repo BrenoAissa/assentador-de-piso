@@ -44,6 +44,13 @@ describe('roomsInCm', () => {
     expect(rooms[0].ring[2]).toEqual({ x: 300, y: 200 });
   });
 
+  it('cômodo sem nome recebe o mesmo rótulo do editor ("Cômodo N")', () => {
+    const p = emptyProject();
+    p.scale = { pxPerCm: 2, source: 'manual', confidence: 1 };
+    p.rooms = [room(), room({ id: 'r2', name: '' }), room({ id: 'r3', name: '' })];
+    expect(roomsInCm(p).map((r) => r.name)).toEqual(['Sala', 'Cômodo 2', 'Cômodo 3']);
+  });
+
   it('sem escala não há cômodos em cm', () => {
     const p = emptyProject();
     p.rooms = [room()];

@@ -25,10 +25,11 @@ export function roomsInCm(project: Project): RoomCm[] {
   const { scale } = project;
   if (!scale) return [];
   return project.rooms
-    .filter((r) => r.receivesTile && isSimple(r.polygonPx))
-    .map((r) => ({
+    .map((r, i) => ({ r, label: r.name.trim() || `Cômodo ${i + 1}` }))
+    .filter(({ r }) => r.receivesTile && isSimple(r.polygonPx))
+    .map(({ r, label }) => ({
       id: r.id,
-      name: r.name || 'Cômodo',
+      name: label,
       ring: scaleRing(r.polygonPx, 1 / scale.pxPerCm),
       ...(r.origin ? { origin: r.origin } : {}),
     }));

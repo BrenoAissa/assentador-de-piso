@@ -1,0 +1,33 @@
+{
+  "name": "paginador-piso",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "idb-keyval": "^6.3.0",
+    "pdfjs-dist": "^5.7.284",
+    "polygon-clipping": "^0.15.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tesseract.js": "^6.0.1",
+    "three": "^0.180.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.180.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}

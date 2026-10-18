@@ -1,5 +1,6 @@
 import { isSimple, scaleRing } from '../geometry/polygon';
 import type { RoomCm } from '../tiling/types';
+import { validateTile } from '../tiling/validate';
 import type { Project, Room, RoomIssue } from '../types';
 
 export const LOW_CONFIDENCE = 0.6;
@@ -42,6 +43,10 @@ export function canAdvance(project: Project, step: Step): { ok: boolean; reason?
     if (roomsInCm(project).length === 0) {
       return { ok: false, reason: 'Marque pelo menos um cômodo válido para receber o piso.' };
     }
+  }
+  if (step === 3) {
+    const errors = validateTile(project.tile, project.layout);
+    if (errors.length > 0) return { ok: false, reason: errors[0] };
   }
   return { ok: true };
 }

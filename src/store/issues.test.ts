@@ -71,6 +71,12 @@ describe('canAdvance', () => {
     expect(canAdvance(p, 2).reason).toMatch(/cômodo/i);
   });
 
+  it('passo 3 com peça inválida não avança', () => {
+    const p = emptyProject();
+    p.tile.lengthCm = 0;
+    expect(canAdvance(p, 3)).toEqual({ ok: false, reason: 'Informe o comprimento e a largura da peça.' });
+  });
+
   it('passo 2 completo avança', () => {
     const p = emptyProject();
     p.scale = { pxPerCm: 2, source: 'manual', confidence: 1 };

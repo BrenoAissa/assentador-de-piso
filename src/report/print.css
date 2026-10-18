@@ -1,0 +1,53 @@
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  #root {
+    display: none !important;
+  }
+
+  .print-sheet {
+    display: block;
+    color: #000;
+    font-size: 10pt;
+  }
+
+  .print-sheet h1 {
+    font-size: 16pt;
+    margin-bottom: 4pt;
+  }
+
+  .print-sheet > p {
+    margin-bottom: 8pt;
+  }
+
+  .print-sheet svg {
+    width: 100%;
+    height: auto;
+    max-height: 200mm;
+    margin-bottom: 6pt;
+  }
+
+  .print-sheet .summary {
+    grid-template-columns: repeat(4, 1fr);
+    margin: 8pt 0;
+  }
+
+  .print-sheet .cut-table {
+    font-size: 9pt;
+  }
+
+  .print-sheet tr {
+    break-inside: avoid;
+  }
+}

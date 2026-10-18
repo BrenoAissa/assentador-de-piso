@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { startAutosave, useProject } from './store/project';
 import ProjectActions from './ui/ProjectActions';
+import StepResult from './ui/StepResult';
 import StepRooms from './ui/StepRooms';
+import StepTile from './ui/StepTile';
 import Stepper from './ui/Stepper';
 import StepUpload from './ui/StepUpload';
 import './ui/app.css';
@@ -37,8 +39,10 @@ export default function App() {
           <StepUpload />
         ) : step === 2 ? (
           <StepRooms />
+        ) : step === 3 ? (
+          <StepTile />
         ) : (
-          <div className="center-msg">Em construção.</div>
+          <StepResult />
         )}
       </main>
     </div>

@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useDetection } from './detection/useDetection';
+import { DetectControls, DetectOverlay } from './editor/DetectControls';
 import { startAutosave, useProject } from './store/project';
 import ProjectActions from './ui/ProjectActions';
 import StepResult from './ui/StepResult';
@@ -36,9 +38,9 @@ export default function App() {
         {!loaded ? (
           <div className="center-msg">Carregando o projeto…</div>
         ) : step === 1 ? (
-          <StepUpload />
+          <StepUpload onPlanReady={(img) => useDetection.getState().run(img.blob)} />
         ) : step === 2 ? (
-          <StepRooms />
+          <StepRooms detectSlot={<DetectControls />} overlay={<DetectOverlay />} />
         ) : step === 3 ? (
           <StepTile />
         ) : (

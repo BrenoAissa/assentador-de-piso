@@ -1,6 +1,6 @@
 import { bbox, cleanRing, polygonArea } from '../geometry/polygon';
-import { binarize, otsu, toGray } from './binarize';
-import { fillHoles, labelComponents, removeSmall } from './components';
+import { densityMask, inkMask, sandwiched } from './binarize';
+import { fillHoles, fillSmallHoles, labelComponents, removeSmall } from './components';
 import { traceContour } from './contour';
 import { closeGaps } from './gaps';
 import { open } from './morphology';
@@ -9,38 +9,52 @@ import { douglasPeucker, orthogonalize } from './simplify';
 import { estimateWallThickness } from './thickness';
 import type { CvResult, CvRoom, DetectOptions, Mask, RGBAImage } from './types';
 
-const MIN_WALL_FRACTION = 0.02;
-
 interface WallPass {
   mode: 'filled' | 'outline';
   t: number;
   walls: Mask;
-  fraction: number;
+}
+
+/**
+ * Paredes cheias ou hachuradas: densidade de tinta numa janela 7×7 ≥ 25% vira faixa sólida;
+ * o filtro "entre tintas" desfaz o quanto a janela engorda a borda de uma parede cheia.
+ */
+function solidWalls(ink: Mask): Mask {
+  return sandwiched(ink, densityMask(ink, 7, 0.25), 3);
 }
 
 function wallPass(ink: Mask, mode: 'filled' | 'outline'): WallPass | null {
-  const src = mode === 'outline' ? fillOutlineWalls(ink) : ink;
+  const raw = mode === 'outline' ? fillOutlineWalls(ink) : solidWalls(ink);
+  const t0 = estimateWallThickness(raw);
+  if (t0 < 3) return null;
+  // furos pequenos dentro da parede (hachura rala) picotariam a parede na abertura
+  const src = fillSmallHoles(raw, t0 * t0);
   const t = estimateWallThickness(src);
   if (t < 3) return null;
   // 0,45·t: paredes internas podem ter metade da espessura das externas (que dominam t)
   const walls = removeSmall(open(src, Math.ceil(0.45 * t)), 12 * t * t);
-  let n = 0;
-  for (const v of walls.data) n += v;
-  return { mode, t, walls, fraction: n / walls.data.length };
+  return { mode, t, walls };
 }
 
-/** Paredes → cômodos (coordenadas em px da imagem recebida). Função pura. */
+/**
+ * Paredes → cômodos (coordenadas em px da imagem recebida). Função pura.
+ * No modo automático tenta paredes cheias/hachuradas e, se não sair nenhum cômodo, paredes
+ * só com contorno; fica com o que encontrar mais cômodos.
+ */
 export function detectRooms(img: RGBAImage, opts: DetectOptions = {}): CvResult {
   const mode = opts.mode ?? 'auto';
-  const gray = toGray(img);
-  const ink = binarize(gray, otsu(gray));
+  const ink = inkMask(img);
 
-  let pass = wallPass(ink, mode === 'outline' ? 'outline' : 'filled');
-  if (mode === 'auto' && (!pass || pass.fraction < MIN_WALL_FRACTION)) {
+  const first = wallPass(ink, mode === 'outline' ? 'outline' : 'filled');
+  let best = first ? { pass: first, rooms: extractRooms(first, ink, opts) } : null;
+  if (mode === 'auto' && (!best || best.rooms.length === 0)) {
     const alt = wallPass(ink, 'outline');
-    if (alt && alt.fraction > (pass?.fraction ?? 0)) pass = alt;
+    if (alt) {
+      const rooms = extractRooms(alt, ink, opts);
+      if (!best || rooms.length > best.rooms.length) best = { pass: alt, rooms };
+    }
   }
-  if (!pass) {
+  if (!best) {
     return {
       rooms: [],
       wallThicknessPx: 0,
@@ -48,10 +62,19 @@ export function detectRooms(img: RGBAImage, opts: DetectOptions = {}): CvResult 
       warnings: ['Não encontrei paredes na planta. Desenhe os cômodos à mão com "Novo cômodo".'],
     };
   }
+  const warnings: string[] = [];
+  if (best.rooms.length === 0) {
+    warnings.push('Nenhum cômodo fechado foi encontrado. Ajuste a sensibilidade ou desenhe os cômodos à mão.');
+  }
+  return { rooms: best.rooms, wallThicknessPx: best.pass.t, mode: best.pass.mode, warnings };
+}
 
+/** Fecha os vãos e transforma cada área livre fechada num polígono de cômodo. */
+function extractRooms(pass: WallPass, ink: Mask, opts: DetectOptions): CvRoom[] {
   const { t, walls } = pass;
-  const D = Math.round(20 * t * (opts.sensitivity ?? 1));
-  const { closed, filled } = closeGaps(walls, t, D);
+  const k = opts.sensitivity ?? 1;
+  // porta/passagem vazia até ~9·t (≈ 1,4 m); janela com caixilho até ~25·t
+  const { closed, filled } = closeGaps(walls, ink, t, { maxOpen: Math.round(9 * t * k), maxFramed: Math.round(25 * t * k) });
   const { labels, stats } = labelComponents(closed, 0);
   const { w } = closed;
   const minArea = (8 * t) * (8 * t);
@@ -90,10 +113,5 @@ export function detectRooms(img: RGBAImage, opts: DetectOptions = {}): CvResult 
     const bb = bbox(b.polygonPx);
     return Math.abs(ba.y - bb.y) > 4 * t ? ba.y - bb.y : ba.x - bb.x;
   });
-
-  const warnings: string[] = [];
-  if (rooms.length === 0) {
-    warnings.push('Nenhum cômodo fechado foi encontrado. Ajuste a sensibilidade ou desenhe os cômodos à mão.');
-  }
-  return { rooms, wallThicknessPx: t, mode: pass.mode, warnings };
+  return rooms;
 }

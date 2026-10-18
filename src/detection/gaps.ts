@@ -2,16 +2,30 @@ import { labelComponents } from './components';
 import { runsAt } from './runs';
 import type { Mask } from './types';
 
+/** Fração de tinta dentro do vão a partir da qual ele é janela (linhas de caixilho). */
+const FRAMED_INK = 0.06;
+
+export interface GapLimits {
+  /** Vão vazio (porta, passagem) é fechado até este comprimento, em px. */
+  maxOpen: number;
+  /** Vão com caixilho (janela) é fechado até este comprimento, em px. */
+  maxFramed: number;
+}
+
 /**
- * Fecha vãos de porta e janela com fechamento direcional.
- * Na vertical, um vão de uma coluna é preenchido só se os trechos de parede acima e abaixo
- * correm na vertical (sequência ≥ 1,5·t) e o vão tem até D. Assim, o interior de um cômodo
- * (limitado por paredes horizontais, sequência = t) não é preenchido. Depois, só ficam os
- * preenchimentos com espessura ≤ 1,5·t no eixo perpendicular. O mesmo vale na horizontal.
+ * Fecha vãos de porta e janela com fechamento direcional, linha a linha (horizontal) e coluna
+ * a coluna (vertical). Um vão entre dois trechos de parede vira candidato quando:
+ * - os dois trechos correm na direção do fechamento (sequência ≥ 1,5·t) e o vão ≤ maxFramed; ou
+ * - só um corre nessa direção e o outro é uma parede perpendicular (porta encostada num canto),
+ *   com vão ≤ maxOpen.
+ * O interior de um cômodo nunca vira candidato: ali as sequências são a espessura das paredes
+ * perpendiculares (≈ t). Depois, cada preenchimento só fica se tiver espessura ≤ 1,5·t e for
+ * curto (≤ maxOpen) ou tiver linhas de caixilho dentro (janela).
  */
-export function closeGaps(walls: Mask, t: number, D: number): { closed: Mask; filled: Mask } {
+export function closeGaps(walls: Mask, ink: Mask, t: number, limits: GapLimits): { closed: Mask; filled: Mask } {
   const { w, h } = walls;
-  const minRun = 1.5 * t;
+  const longRun = 1.5 * t;
+  const perpRun = Math.max(2, 0.4 * t);
   const maxThick = 1.5 * t + 2;
 
   const candidates = (horizontal: boolean): Mask => {
@@ -22,23 +36,35 @@ export function closeGaps(walls: Mask, t: number, D: number): { closed: Mask; fi
       for (let k = 1; k < runs.length; k++) {
         const a = runs[k - 1];
         const b = runs[k];
-        if (b.start - a.end > D || a.end - a.start < minRun || b.end - b.start < minRun) continue;
+        const gap = b.start - a.end;
+        const la = a.end - a.start;
+        const lb = b.end - b.start;
+        const both = la >= longRun && lb >= longRun && gap <= limits.maxFramed;
+        const corner = ((la >= longRun && lb >= perpRun) || (lb >= longRun && la >= perpRun)) && gap <= limits.maxOpen;
+        if (!both && !corner) continue;
         for (let i = a.end; i < b.start; i++) f[horizontal ? l * w + i : i * w + l] = 1;
       }
     }
     return { w, h, data: f };
   };
 
-  const keepThin = (f: Mask, horizontal: boolean): Uint8Array => {
+  const keep = (f: Mask, horizontal: boolean): Uint8Array => {
     const { labels, stats } = labelComponents(f, 1);
-    const ok = stats.map((s) => (horizontal ? s.maxY - s.minY + 1 : s.maxX - s.minX + 1) <= maxThick);
+    const inkCount = new Float64Array(stats.length);
+    for (let i = 0; i < w * h; i++) if (labels[i] && ink.data[i]) inkCount[labels[i] - 1]++;
+    const ok = stats.map((s, idx) => {
+      const thick = horizontal ? s.maxY - s.minY + 1 : s.maxX - s.minX + 1;
+      const length = horizontal ? s.maxX - s.minX + 1 : s.maxY - s.minY + 1;
+      const framed = inkCount[idx] / s.area >= FRAMED_INK;
+      return thick <= maxThick && (length <= limits.maxOpen || framed);
+    });
     const out = new Uint8Array(w * h);
     for (let i = 0; i < w * h; i++) if (labels[i] && ok[labels[i] - 1]) out[i] = 1;
     return out;
   };
 
-  const fh = keepThin(candidates(true), true);
-  const fv = keepThin(candidates(false), false);
+  const fh = keep(candidates(true), true);
+  const fv = keep(candidates(false), false);
   const closed = new Uint8Array(w * h);
   const filled = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {

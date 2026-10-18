@@ -3,7 +3,7 @@ import { bbox } from '../geometry/polygon';
 import type { Ring } from '../geometry/types';
 import { detectRooms } from './pipeline';
 import { readGrayPng } from './pngTestUtil';
-import { clearRect, fillRect, frame, line, makeMask, maskToImage } from './synthetic';
+import { clearRect, fillRect, frame, hatchedRect, line, makeMask, maskToImage, paintRGB } from './synthetic';
 
 /** Moldura 400×300 (paredes de 10 px) com uma parede vertical e uma horizontal: 3 cômodos. */
 function threeRooms() {
@@ -41,6 +41,27 @@ describe('detectRooms', () => {
     const res = detectRooms(maskToImage(m));
     expect(res.rooms).toHaveLength(3);
     expect(hasRect(res.rooms, 30, 30, 180, 270)).toBe(true);
+  });
+
+  it('porta encostada numa parede perpendicular também é fechada', () => {
+    const m = threeRooms();
+    clearRect(m, 190, 140, 80, 10); // vão começa colado na parede vertical
+    const res = detectRooms(maskToImage(m));
+    expect(res.rooms).toHaveLength(3);
+  });
+
+  it('abertura larga vazia fica aberta; janela larga com caixilho é fechada', () => {
+    const m = makeMask(400, 300);
+    frame(m, 20, 20, 360, 260, 10);
+    fillRect(m, 180, 30, 10, 240);
+    clearRect(m, 180, 80, 10, 150); // passagem de 150 px (cozinha integrada)
+    clearRect(m, 210, 20, 150, 10); // janela de 150 px na parede de cima...
+    line(m, 210, 23, 360, 23); // ...com duas linhas de caixilho
+    line(m, 210, 26, 360, 26);
+    const res = detectRooms(maskToImage(m));
+    expect(res.rooms).toHaveLength(1);
+    const b = bbox(res.rooms[0].polygonPx);
+    expect(near(b.x, 30) && near(b.y, 30) && near(b.x + b.w, 370) && near(b.y + b.h, 270)).toBe(true);
   });
 
   it('corredor de 30 px entre paredes paralelas não é fechado', () => {
@@ -106,6 +127,29 @@ describe('detectRooms', () => {
     expect(res.rooms).toHaveLength(7);
     // sala: interior de 115..1190 × 115..990 px (2 px/cm, margem de 100 px)
     expect(hasRect(res.rooms, 115, 115, 1190, 990)).toBe(true);
+  });
+
+  it('paredes hachuradas, cotas dentro dos cômodos e faixa colorida → 3 cômodos', () => {
+    const m = makeMask(420, 320);
+    // moldura hachurada de 12 px e paredes internas hachuradas
+    hatchedRect(m, 30, 30, 360, 12);
+    hatchedRect(m, 30, 278, 360, 12);
+    hatchedRect(m, 30, 30, 12, 260);
+    hatchedRect(m, 378, 30, 12, 260);
+    hatchedRect(m, 190, 42, 10, 236);
+    hatchedRect(m, 200, 150, 178, 10);
+    // linhas de cota de 1 px a ~10 px das paredes, com tracinhos nas pontas
+    line(m, 42, 55, 190, 55);
+    line(m, 55, 42, 55, 278);
+    line(m, 200, 170, 378, 170);
+    for (const x of [42, 190]) line(m, x - 3, 52, x + 3, 58);
+    const img = maskToImage(m);
+    paintRGB(img, 0, 0, 120, 25, [214, 176, 0]); // faixa amarela no canto
+    const res = detectRooms(img);
+    expect(res.rooms).toHaveLength(3);
+    expect(hasRect(res.rooms, 42, 42, 190, 278)).toBe(true);
+    expect(hasRect(res.rooms, 200, 42, 378, 150)).toBe(true);
+    expect(hasRect(res.rooms, 200, 160, 378, 278)).toBe(true);
   });
 
   it('planta vazia não quebra e avisa', () => {

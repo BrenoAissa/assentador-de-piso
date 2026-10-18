@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { binarize, otsu, toGray } from './binarize';
-import { labelComponents, fillHoles } from './components';
+import { fillHoles, fillSmallHoles, labelComponents } from './components';
 import { traceContour } from './contour';
 import { dilate, erode, open } from './morphology';
 import { estimateWallThickness } from './thickness';
@@ -60,6 +60,17 @@ describe('componentes e contorno', () => {
     fillRect(m, 2, 2, 16, 16);
     fillRect(m, 8, 8, 4, 4, 0);
     expect(count(fillHoles(m).data)).toBe(256);
+  });
+
+  it('preenche só os furos pequenos dentro da tinta', () => {
+    const m = makeMask(80, 60);
+    frame(m, 5, 5, 70, 50, 12);
+    fillRect(m, 20, 8, 2, 2, 0); // furo de 4 px dentro da parede
+    fillRect(m, 40, 45, 3, 3, 0); // furo de 9 px
+    const out = fillSmallHoles(m, 16);
+    expect(out.data[8 * 80 + 20]).toBe(1);
+    expect(out.data[46 * 80 + 41]).toBe(1);
+    expect(out.data[30 * 80 + 40]).toBe(0); // o cômodo (grande) continua vazio
   });
 
   it('contorno pelos cantos dos pixels dá o retângulo exato', () => {

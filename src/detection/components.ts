@@ -69,6 +69,17 @@ export function fillHoles(region: Mask): Mask {
   return { w, h, data: out };
 }
 
+/** Preenche furos de fundo com área ≤ `maxArea` que não tocam a borda (falhas na hachura). */
+export function fillSmallHoles(m: Mask, maxArea: number): Mask {
+  const { labels, stats } = labelComponents(m, 0);
+  const out = m.data.slice();
+  for (let i = 0; i < out.length; i++) {
+    const l = labels[i];
+    if (l && !stats[l - 1].touchesBorder && stats[l - 1].area <= maxArea) out[i] = 1;
+  }
+  return { w: m.w, h: m.h, data: out };
+}
+
 /** Remove componentes de tinta com área menor que `minArea`. */
 export function removeSmall(m: Mask, minArea: number): Mask {
   const { labels, stats } = labelComponents(m, 1);

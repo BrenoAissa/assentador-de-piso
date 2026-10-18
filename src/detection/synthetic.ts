@@ -32,6 +32,35 @@ export function line(m: Mask, x0: number, y0: number, x1: number, y1: number): v
   }
 }
 
+/** Retângulo de parede em contorno de 1 px com hachura diagonal a cada `period` px. */
+export function hatchedRect(m: Mask, x: number, y: number, w: number, h: number, period = 3): void {
+  for (let j = y; j < y + h; j++) {
+    for (let i = x; i < x + w; i++) {
+      const edge = i === x || j === y || i === x + w - 1 || j === y + h - 1;
+      if (edge || (i + j) % period === 0) m.data[j * m.w + i] = 1;
+    }
+  }
+}
+
+/** Pinta um retângulo colorido (RGB) numa imagem RGBA. */
+export function paintRGB(
+  img: { width: number; data: Uint8ClampedArray },
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rgb: [number, number, number],
+): void {
+  for (let j = y; j < y + h; j++) {
+    for (let i = x; i < x + w; i++) {
+      const k = (j * img.width + i) * 4;
+      img.data[k] = rgb[0];
+      img.data[k + 1] = rgb[1];
+      img.data[k + 2] = rgb[2];
+    }
+  }
+}
+
 /** Converte a máscara em imagem RGBA (tinta escura sobre fundo branco). */
 export function maskToImage(m: Mask): { width: number; height: number; data: Uint8ClampedArray } {
   const data = new Uint8ClampedArray(m.w * m.h * 4);

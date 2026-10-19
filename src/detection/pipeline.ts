@@ -77,7 +77,8 @@ function extractRooms(pass: WallPass, ink: Mask, opts: DetectOptions): CvRoom[] 
   const { closed, filled } = closeGaps(walls, ink, t, { maxOpen: Math.round(9 * t * k), maxFramed: Math.round(25 * t * k) });
   const { labels, stats } = labelComponents(closed, 0);
   const { w } = closed;
-  const minArea = (8 * t) * (8 * t);
+  // (5·t)² ≈ 0,6 m² com paredes de 15 cm: corredores, lavabos e closets entram
+  const minArea = (5 * t) * (5 * t);
   const rooms: CvRoom[] = [];
 
   stats.forEach((s, idx) => {

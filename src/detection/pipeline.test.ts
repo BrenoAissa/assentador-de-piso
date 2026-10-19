@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { bbox } from '../geometry/polygon';
 import type { Ring } from '../geometry/types';
 import { detectRooms } from './pipeline';
@@ -46,6 +47,28 @@ describe('detectRooms', () => {
   it('porta encostada numa parede perpendicular também é fechada', () => {
     const m = threeRooms();
     clearRect(m, 190, 140, 80, 10); // vão começa colado na parede vertical
+    const res = detectRooms(maskToImage(m));
+    expect(res.rooms).toHaveLength(3);
+  });
+
+  it('louça encostada na parede não estraga o fechamento da porta ao lado', () => {
+    const m = makeMask(400, 300);
+    frame(m, 20, 20, 360, 260, 10);
+    fillRect(m, 180, 30, 10, 240); // parede vertical
+    clearRect(m, 180, 60, 10, 50); // porta nela
+    fillRect(m, 30, 130, 150, 10); // cômodo de cima baixo (100 px)
+    fillRect(m, 150, 30, 30, 15); // bancada/pia encostada na parede de cima e na vertical
+    const res = detectRooms(maskToImage(m));
+    expect(res.rooms).toHaveLength(3);
+  });
+
+  it('porta só fecha depois que a passagem vizinha vira parede (duas rodadas)', () => {
+    const m = makeMask(400, 300);
+    frame(m, 20, 20, 360, 260, 10);
+    fillRect(m, 250, 30, 10, 240); // parede vertical com passagem
+    clearRect(m, 250, 120, 10, 60);
+    fillRect(m, 30, 140, 140, 10); // parede horizontal que termina antes da vertical
+    // a porta (170..250) só tem a parede vertical do outro lado depois de fechada a passagem
     const res = detectRooms(maskToImage(m));
     expect(res.rooms).toHaveLength(3);
   });
@@ -150,6 +173,29 @@ describe('detectRooms', () => {
     expect(hasRect(res.rooms, 42, 42, 190, 278)).toBe(true);
     expect(hasRect(res.rooms, 200, 42, 378, 150)).toBe(true);
     expect(hasRect(res.rooms, 200, 160, 378, 278)).toBe(true);
+  });
+
+  // Planta real do usuário: fica só na máquina dele (planta-real/ é ignorada pelo git).
+  const realPlan = 'planta-real/pagina-1.png';
+  it.skipIf(!existsSync(realPlan))('planta real (paredes hachuradas, documento com logotipos) → cômodos principais', async () => {
+    const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+    const img = await loadImage(realPlan);
+    const f = 1600 / Math.max(img.width, img.height);
+    const c = createCanvas(Math.round(img.width * f), Math.round(img.height * f));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data as unknown as Uint8ClampedArray;
+    const res = detectRooms({ width: c.width, height: c.height, data });
+    const boxes = res.rooms.map((r) => bbox(r.polygonPx));
+    const hasBox = (x0: number, y0: number, x1: number, y1: number) =>
+      boxes.some((b) => Math.abs(b.x - x0) <= 4 && Math.abs(b.y - y0) <= 4 && Math.abs(b.x + b.w - x1) <= 4 && Math.abs(b.y + b.h - y1) <= 4);
+    expect(res.rooms.length).toBeGreaterThanOrEqual(6);
+    expect(hasBox(311, 525, 545, 696)).toBe(true); // quarto 1
+    expect(hasBox(310, 799, 546, 958)).toBe(true); // quarto 2
+    expect(hasBox(558, 680, 821, 958)).toBe(true); // sala + cozinha
+    expect(hasBox(575, 600, 713, 666)).toBe(true); // área de serviço
   });
 
   it('planta vazia não quebra e avisa', () => {

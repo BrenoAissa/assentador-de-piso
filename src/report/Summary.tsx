@@ -1,19 +1,16 @@
 import type { LayoutSummary, TileSpec } from '../tiling/types';
 import { fmt, fmtFixed } from '../ui/format';
 
-export default function Summary({ summary, tile }: { summary: LayoutSummary; tile: TileSpec }) {
-  const s = summary;
-  return (
+interface Props {
+  summary: LayoutSummary;
+  tile: TileSpec;
+  /** Mostra os detalhes abertos (impressão). */
+  expanded?: boolean;
+}
+
+export default function Summary({ summary: s, tile, expanded }: Props) {
+  const details = (
     <dl className="summary">
-      <div className="summary-main">
-        <dt>Comprar</dt>
-        <dd>
-          {s.boxes} {s.boxes === 1 ? 'caixa' : 'caixas'}
-        </dd>
-        <p className="muted">
-          {s.tilesToBuy} peças, já com {fmt(tile.wastePct)}% de margem para quebras
-        </p>
-      </div>
       <div>
         <dt>Área de piso</dt>
         <dd>{fmtFixed(s.areaM2, 2)} m²</dd>
@@ -23,21 +20,49 @@ export default function Summary({ summary, tile }: { summary: LayoutSummary; til
         <dd>{s.full}</dd>
       </div>
       <div>
-        <dt>Recortes</dt>
+        <dt>Peças recortadas</dt>
         <dd>{s.cut}</dd>
-      </div>
-      <div>
-        <dt>Filetes</dt>
-        <dd className={s.slivers > 0 ? 'bad' : undefined}>{s.slivers}</dd>
       </div>
       <div>
         <dt>Saem de sobras</dt>
         <dd>{s.fromLeftovers}</dd>
       </div>
+      {s.removed > 0 && (
+        <div>
+          <dt>Apagadas (móvel fixo)</dt>
+          <dd>{s.removed}</dd>
+        </div>
+      )}
       <div>
         <dt>Desperdício</dt>
         <dd>{fmt(s.wastePct)}%</dd>
       </div>
     </dl>
+  );
+
+  return (
+    <div className="summary2">
+      <div className="buy">
+        <span className="muted">Comprar</span>
+        <strong>
+          {s.boxes} {s.boxes === 1 ? 'caixa' : 'caixas'}
+        </strong>
+        <span className="muted">
+          {s.tilesToBuy} peças, com {fmt(tile.wastePct)}% de folga para quebras
+        </span>
+      </div>
+      <p className={s.slivers > 0 ? 'sliver-line bad' : 'sliver-line good'}>
+        {s.slivers === 0 ? 'Nenhum filete à vista.' : s.slivers === 1 ? '1 filete à vista.' : `${s.slivers} filetes à vista.`}
+        {s.hidden > 0 && <span className="muted"> {s.hidden === 1 ? '1 escondido' : `${s.hidden} escondidos`} embaixo de móvel.</span>}
+      </p>
+      {expanded ? (
+        details
+      ) : (
+        <details className="details">
+          <summary>Detalhes</summary>
+          {details}
+        </details>
+      )}
+    </div>
   );
 }

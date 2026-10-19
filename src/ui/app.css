@@ -840,6 +840,133 @@ select {
   }
 }
 
+/* ---------- montagem ---------- */
+
+.summary2 {
+  display: grid;
+  gap: 10px;
+}
+
+.summary2 .buy {
+  display: grid;
+  gap: 2px;
+}
+
+.summary2 .buy strong {
+  font-size: 2rem;
+  font-stretch: 80%;
+  line-height: 1.05;
+}
+
+.sliver-line {
+  font-weight: 600;
+}
+
+.sliver-line.good {
+  color: var(--ok);
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--grafite-2);
+  font-size: 0.88rem;
+}
+
+.details[open] summary {
+  margin-bottom: 10px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tool-grid button {
+  padding: 9px 8px;
+  border: 1px solid var(--rejunte);
+  border-radius: 6px;
+  background: var(--prancheta);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.tool-grid button[aria-pressed='true'] {
+  background: var(--fita);
+  border-color: var(--fita-escura);
+  font-weight: 650;
+}
+
+.thumb-picker {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.thumb-picker button {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border: 1px solid var(--rejunte);
+  border-radius: 6px;
+  background: var(--prancheta);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.thumb-picker button[aria-pressed='true'] {
+  border-color: var(--grafite);
+  box-shadow: inset 0 0 0 1px var(--grafite);
+  font-weight: 650;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tile-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tile-cards button {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid var(--rejunte);
+  border-radius: 6px;
+  background: var(--prancheta);
+  cursor: pointer;
+}
+
+.tile-cards button svg {
+  grid-row: 1 / 3;
+}
+
+.tile-cards .tile-label {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.tile-cards .muted {
+  font-size: 0.78rem;
+}
+
+.tile-cards button[aria-pressed='true'] {
+  border-color: var(--grafite);
+  box-shadow: inset 0 0 0 1px var(--grafite);
+}
+
 /* ---------- celular ---------- */
 
 @media (max-width: 860px) {

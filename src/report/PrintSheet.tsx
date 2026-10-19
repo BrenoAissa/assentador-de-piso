@@ -35,7 +35,7 @@ export default function PrintSheet({ result, rooms, tile, layout }: Props) {
         Cinza: peça inteira. Azul: recortada. Vermelho: filete. Borda tracejada: sai da sobra de outra peça. Ponto
         amarelo: canto de partida da grade.
       </p>
-      <Summary summary={result.summary} tile={tile} />
+      <Summary summary={result.summary} tile={tile} expanded />
       <CutTable result={result} rooms={rooms} />
     </div>,
     document.body,

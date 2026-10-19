@@ -10,6 +10,15 @@ export const PIECE_FILL: Record<Piece['kind'], string> = {
   sliver: '#ee8a7f',
 };
 
+/** Peça marcada como embaixo de móvel. */
+export const HIDDEN_FILL = '#cbbfe3';
+
+export function pieceFill(p: Piece): string {
+  if (p.removed) return '#ffffff';
+  if (p.hidden) return HIDDEN_FILL;
+  return PIECE_FILL[p.kind];
+}
+
 const pts = (ring: Ring) => ring.map((q) => `${q.x},${q.y}`).join(' ');
 
 interface Props {
@@ -32,21 +41,24 @@ function PlanSvg({ result, rooms, fontSize, showNumbers, showCuts, hairline, sca
       {rooms.map((r) => (
         <polygon key={`b${r.id}`} points={pts(r.ring)} fill="#6b7177" />
       ))}
-      {result.pieces.map((p) => (
-        <g key={p.n} data-piece={p.n}>
-          {p.shape.map((ring, i) => (
-            <polygon
-              key={i}
-              points={pts(ring)}
-              fill={PIECE_FILL[p.kind]}
-              stroke={p.fromLeftoverOf !== undefined ? '#1f4f8a' : '#ffffff'}
-              strokeWidth={p.fromLeftoverOf !== undefined ? hairline * 1.6 : hairline}
-              strokeDasharray={p.fromLeftoverOf !== undefined ? `${hairline * 4} ${hairline * 3}` : undefined}
-              vectorEffect={ve}
-            />
-          ))}
-        </g>
-      ))}
+      {result.pieces.map((p) => {
+        const fromLeftover = p.fromLeftoverOf !== undefined && !p.removed;
+        return (
+          <g key={p.key} data-piece={p.key}>
+            {p.shape.map((ring, i) => (
+              <polygon
+                key={i}
+                points={pts(ring)}
+                fill={pieceFill(p)}
+                stroke={p.removed ? '#5f666c' : fromLeftover ? '#1f4f8a' : '#ffffff'}
+                strokeWidth={fromLeftover || p.removed ? hairline * 1.6 : hairline}
+                strokeDasharray={fromLeftover || p.removed ? `${hairline * 4} ${hairline * 3}` : undefined}
+                vectorEffect={ve}
+              />
+            ))}
+          </g>
+        );
+      })}
       {rooms.map((r) => (
         <polygon
           key={`w${r.id}`}
@@ -60,23 +72,31 @@ function PlanSvg({ result, rooms, fontSize, showNumbers, showCuts, hairline, sca
       ))}
       {showNumbers && (
         <g pointerEvents="none" fontFamily="inherit" textAnchor="middle" fill="#22262a">
-          {result.pieces.map((p) => {
-            const b = bbox(p.shape);
-            const cx = b.x + b.w / 2;
-            const cy = b.y + b.h / 2;
-            const cut = showCuts && p.kind !== 'full' ? cutLabel(p) : '';
-            const small = Math.min(b.w, b.h) < fontSize * 1.6;
-            return (
-              <text key={p.n} x={cx} y={cy + (cut && !small ? -fontSize * 0.15 : fontSize * 0.35)} fontSize={small ? fontSize * 0.7 : fontSize} fontWeight={650}>
-                {p.n}
-                {cut && !small && (
-                  <tspan x={cx} dy={fontSize * 0.95} fontSize={fontSize * 0.72} fontWeight={450}>
-                    {cut}
-                  </tspan>
-                )}
-              </text>
-            );
-          })}
+          {result.pieces
+            .filter((p) => !p.removed)
+            .map((p) => {
+              const b = bbox(p.shape);
+              const cx = b.x + b.w / 2;
+              const cy = b.y + b.h / 2;
+              const cut = showCuts && p.kind !== 'full' ? cutLabel(p) : '';
+              const small = Math.min(b.w, b.h) < fontSize * 1.6;
+              return (
+                <text
+                  key={p.key}
+                  x={cx}
+                  y={cy + (cut && !small ? -fontSize * 0.15 : fontSize * 0.35)}
+                  fontSize={small ? fontSize * 0.7 : fontSize}
+                  fontWeight={650}
+                >
+                  {p.n}
+                  {cut && !small && (
+                    <tspan x={cx} dy={fontSize * 0.95} fontSize={fontSize * 0.72} fontWeight={450}>
+                      {cut}
+                    </tspan>
+                  )}
+                </text>
+              );
+            })}
         </g>
       )}
     </>

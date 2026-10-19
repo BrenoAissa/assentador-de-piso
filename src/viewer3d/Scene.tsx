@@ -3,7 +3,7 @@ import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { BoxGeometry, Color, ExtrudeGeometry, InstancedMesh, Matrix4, ShapeGeometry } from 'three';
 import { bbox } from '../geometry/polygon';
-import { PIECE_FILL } from '../report/PlanSvg';
+import { PIECE_FILL, pieceFill } from '../report/PlanSvg';
 import type { LayoutResult, Piece, RoomCm } from '../tiling/types';
 import { ringsToShapes, wallSegments } from './geometry';
 
@@ -17,14 +17,14 @@ const FLAT = -Math.PI / 2;
 interface Props {
   result: LayoutResult;
   rooms: RoomCm[];
-  selected: number | null;
-  onSelect(n: number | null): void;
+  selected: string | null;
+  onSelect(key: string | null): void;
 }
 
 /** Clique de verdade: ignora o soltar do mouse depois de girar a câmera. */
 const isClick = (e: ThreeEvent<MouseEvent>) => e.delta < 5;
 
-function PieceMesh({ piece, selected, onSelect }: { piece: Piece; selected: boolean; onSelect(n: number): void }) {
+function PieceMesh({ piece, selected, onSelect }: { piece: Piece; selected: boolean; onSelect(key: string): void }) {
   const geometry = useMemo(
     () => new ExtrudeGeometry(ringsToShapes(piece.shape), { depth: TILE_H, bevelEnabled: false }),
     [piece.shape],
@@ -38,16 +38,16 @@ function PieceMesh({ piece, selected, onSelect }: { piece: Piece; selected: bool
       onClick={(e) => {
         if (!isClick(e)) return;
         e.stopPropagation();
-        onSelect(piece.n);
+        onSelect(piece.key);
       }}
     >
-      <meshStandardMaterial color={selected ? SELECTED : PIECE_FILL[piece.kind]} roughness={0.55} />
+      <meshStandardMaterial color={selected ? SELECTED : pieceFill(piece)} roughness={0.55} />
     </mesh>
   );
 }
 
 /** Peças inteiras como instâncias (plantas com muitas peças). */
-function FullTiles({ pieces, selected, onSelect }: { pieces: Piece[]; selected: number | null; onSelect(n: number): void }) {
+function FullTiles({ pieces, selected, onSelect }: { pieces: Piece[]; selected: string | null; onSelect(key: string): void }) {
   const ref = useRef<InstancedMesh>(null);
   const box = useMemo(() => new BoxGeometry(1, TILE_H, 1), []);
   useLayoutEffect(() => {
@@ -60,7 +60,7 @@ function FullTiles({ pieces, selected, onSelect }: { pieces: Piece[]; selected: 
       const r = p.tileRect;
       m.makeScale(r.w, 1, r.h).setPosition(r.x + r.w / 2, 0.4 + TILE_H / 2, r.y + r.h / 2);
       mesh.setMatrixAt(i, m);
-      mesh.setColorAt(i, p.n === selected ? hi : base);
+      mesh.setColorAt(i, p.key === selected ? hi : base);
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -72,7 +72,7 @@ function FullTiles({ pieces, selected, onSelect }: { pieces: Piece[]; selected: 
       onClick={(e) => {
         if (!isClick(e) || e.instanceId === undefined) return;
         e.stopPropagation();
-        onSelect(pieces[e.instanceId].n);
+        onSelect(pieces[e.instanceId].key);
       }}
     >
       <meshStandardMaterial roughness={0.55} />
@@ -108,9 +108,10 @@ export default function Scene({ result, rooms, selected, onSelect }: Props) {
   const cx = b.x + b.w / 2;
   const cz = b.y + b.h / 2;
   const size = Math.max(b.w, b.h, 100);
-  const many = result.pieces.length > INSTANCE_ABOVE;
-  const full = useMemo(() => result.pieces.filter((p) => p.kind === 'full'), [result]);
-  const meshes = many ? result.pieces.filter((p) => p.kind !== 'full') : result.pieces;
+  const placed = useMemo(() => result.pieces.filter((p) => !p.removed), [result]);
+  const many = placed.length > INSTANCE_ABOVE;
+  const full = useMemo(() => placed.filter((p) => p.kind === 'full' && !p.hidden), [placed]);
+  const meshes = many ? placed.filter((p) => p.kind !== 'full' || p.hidden) : placed;
 
   return (
     <div className="canvas canvas-3d">
@@ -130,7 +131,7 @@ export default function Scene({ result, rooms, selected, onSelect }: Props) {
         </Bounds>
         {many && <FullTiles pieces={full} selected={selected} onSelect={onSelect} />}
         {meshes.map((p) => (
-          <PieceMesh key={p.n} piece={p} selected={p.n === selected} onSelect={onSelect} />
+          <PieceMesh key={p.key} piece={p} selected={p.key === selected} onSelect={onSelect} />
         ))}
         {rooms.map((r) => (
           <Walls key={r.id} room={r} />

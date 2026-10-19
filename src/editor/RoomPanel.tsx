@@ -1,7 +1,9 @@
 import { canAdvance, ISSUE_TEXT } from '../store/issues';
 import { useProject } from '../store/project';
+import { isDrawn } from '../types';
 import { useEditor } from './editorStore';
 import { roomSizeLabel } from './ops';
+import WallsEditor from './WallsEditor';
 
 const fmtScale = (pxPerCm: number) =>
   `1 m = ${(pxPerCm * 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} px`;
@@ -19,31 +21,45 @@ export default function RoomPanel({ detectSlot }: Props) {
   const { scale, rooms } = project;
   const next = canAdvance(project, 2);
   const pending = rooms.reduce((n, r) => n + r.issues.length, 0) + (scale ? 0 : 1);
+  const drawn = isDrawn(project);
 
   return (
     <aside className="panel" aria-label="Cômodos">
-      <section className="panel-section">
-        <div className="scale-line">
-          <h3>Escala</h3>
+      {drawn ? (
+        <section className="panel-section">
+          <div className="scale-line">
+            <h3>Planta desenhada</h3>
+            <span className="badge badge-ok">escala real</span>
+          </div>
+          <p className="muted">
+            Tudo aqui está em centímetros. Comece por "Cômodo retangular" (largura × comprimento) ou por "Desenhar paredes",
+            digitando cada medida da trena.
+          </p>
+        </section>
+      ) : (
+        <section className="panel-section">
+          <div className="scale-line">
+            <h3>Escala</h3>
+            {scale ? (
+              <span className={`badge ${scale.source === 'manual' || scale.confidence >= 0.7 ? 'badge-ok' : 'badge-warn'}`}>
+                {scale.source === 'manual' ? 'calibrada' : 'lida das cotas'}
+              </span>
+            ) : (
+              <span className="badge badge-warn">falta definir</span>
+            )}
+          </div>
           {scale ? (
-            <span className={`badge ${scale.source === 'manual' || scale.confidence >= 0.7 ? 'badge-ok' : 'badge-warn'}`}>
-              {scale.source === 'manual' ? 'calibrada' : 'lida das cotas'}
-            </span>
+            <p className="muted">{fmtScale(scale.pxPerCm)}. Se as medidas dos cômodos não baterem, calibre de novo.</p>
           ) : (
-            <span className="badge badge-warn">falta definir</span>
+            <p className="muted">Sem escala o app não sabe o tamanho real. Marque uma medida conhecida na planta.</p>
           )}
-        </div>
-        {scale ? (
-          <p className="muted">{fmtScale(scale.pxPerCm)}. Se as medidas dos cômodos não baterem, calibre de novo.</p>
-        ) : (
-          <p className="muted">Sem escala o app não sabe o tamanho real. Marque uma medida conhecida na planta.</p>
-        )}
-        <div>
-          <button className="btn btn-sm" onClick={() => setTool('calibrate')}>
-            {scale ? 'Calibrar de novo' : 'Calibrar escala'}
-          </button>
-        </div>
-      </section>
+          <div>
+            <button className="btn btn-sm" onClick={() => setTool('calibrate')}>
+              {scale ? 'Calibrar de novo' : 'Calibrar escala'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="panel-section">
         <div className="scale-line">
@@ -57,7 +73,9 @@ export default function RoomPanel({ detectSlot }: Props) {
 
         {rooms.length === 0 && (
           <p className="muted">
-            Nenhum cômodo ainda. Use "Novo cômodo" e clique nos cantos de cada ambiente sobre a planta.
+            {drawn
+              ? 'Nenhum cômodo ainda. Use "Cômodo retangular" ou "Desenhar paredes" na barra da planta.'
+              : 'Nenhum cômodo ainda. Use "Desenhar paredes" e clique nos cantos de cada ambiente sobre a planta, ou "Cômodo retangular" com as medidas.'}
           </p>
         )}
 
@@ -88,6 +106,9 @@ export default function RoomPanel({ detectSlot }: Props) {
                 </button>
               </div>
               {scale && <span className="muted">{roomSizeLabel(room.polygonPx, scale.pxPerCm)}</span>}
+              {scale && room.id === selectedRoomId && (
+                <WallsEditor roomId={room.id} ring={room.polygonPx} pxPerCm={scale.pxPerCm} />
+              )}
               <label className="check" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
@@ -124,7 +145,7 @@ export default function RoomPanel({ detectSlot }: Props) {
         {!next.ok && <p className="error">{next.reason}</p>}
         <div className="row">
           <button className="btn" onClick={() => setStep(1)}>
-            Trocar planta
+            {drawn ? 'Usar uma planta' : 'Trocar planta'}
           </button>
           <button className="btn btn-primary" disabled={!next.ok} onClick={() => setStep(3)}>
             Continuar para o piso

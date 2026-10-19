@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { deleteImage, loadImage, loadProject, saveImage, saveProject } from '../persistence/db';
 import { NO_EDITS, type LayoutResult, type ManualEdits } from '../tiling/types';
-import { emptyProject, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
+import { drawnPlan, emptyProject, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
 import { layoutChangeResetsEdits, pushHistory } from './edits';
 import { computeIssues, type Step } from './issues';
 
@@ -25,6 +25,8 @@ interface ProjectState {
   loaded: boolean;
 
   setPlan(blob: Blob, meta: Omit<PlanImage, 'imageId'>): Promise<void>;
+  /** Começa um projeto desenhado do zero (sem imagem, escala real). */
+  startDrawing(): void;
   setScale(s: Scale | null): void;
   setRooms(rooms: Room[]): void;
   addRoom(room: Room): void;
@@ -81,6 +83,15 @@ export const useProject = create<ProjectState>((set, get) => {
       showImage(blob);
       update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS }));
       set({ selectedRoomId: null, history: [] });
+    },
+
+    startDrawing() {
+      const old = get().project.plan;
+      if (old?.imageId) void deleteImage(old.imageId);
+      showImage(null);
+      const { plan, scale } = drawnPlan();
+      update((p) => ({ ...p, plan, scale, rooms: [], edits: NO_EDITS }));
+      set({ selectedRoomId: null, history: [], step: 2 });
     },
 
     setScale(scale) {
@@ -161,9 +172,11 @@ export const useProject = create<ProjectState>((set, get) => {
       try {
         const project = await loadProject();
         if (project) {
-          const image = project.plan ? await loadImage(project.plan.imageId) : null;
+          const drawn = project.plan?.kind === 'drawn';
+          const image = project.plan && !drawn ? await loadImage(project.plan.imageId) : null;
+          const keep = drawn || !!image;
           showImage(image);
-          set({ project: image ? project : { ...project, plan: null }, step: image ? 2 : 1 });
+          set({ project: keep ? project : { ...project, plan: null }, step: keep ? 2 : 1 });
         }
       } finally {
         set({ loaded: true });
@@ -172,7 +185,9 @@ export const useProject = create<ProjectState>((set, get) => {
 
     async replaceProject(project, image) {
       let plan = project.plan;
-      if (plan && image) {
+      if (plan?.kind === 'drawn') {
+        // desenhado no app: não tem imagem
+      } else if (plan && image) {
         const imageId = crypto.randomUUID();
         await saveImage(imageId, image);
         plan = { ...plan, imageId };

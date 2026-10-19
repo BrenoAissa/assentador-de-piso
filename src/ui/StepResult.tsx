@@ -284,10 +284,12 @@ export default function StepResult() {
             ))}
           </div>
           {notice && <p className="issue">{notice}</p>}
-          <label className="check">
-            <input type="checkbox" checked={showFurniture} onChange={(e) => setShowFurniture(e.target.checked)} />
-            Mostrar os móveis da planta
-          </label>
+          {planUrl && (
+            <label className="check">
+              <input type="checkbox" checked={showFurniture} onChange={(e) => setShowFurniture(e.target.checked)} />
+              Mostrar os móveis da planta
+            </label>
+          )}
           {global && layout.origin !== 'auto' && (
             <div>
               <button className="btn btn-sm btn-quiet" onClick={() => setLayout({ origin: 'auto' })}>

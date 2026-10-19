@@ -20,6 +20,8 @@ export function DetectControls() {
   const planBlob = useProject((s) => s.planBlob);
   const hasRooms = useProject((s) => s.project.rooms.length > 0);
 
+  if (!planBlob) return null;
+
   const redo = () => {
     if (!planBlob) return;
     if (hasRooms && !window.confirm('Substituir os cômodos atuais pelos que forem detectados?')) return;

@@ -9,7 +9,7 @@ interface Props {
 
 export default function StepUpload({ onPlanReady }: Props) {
   const hasPlan = useProject((s) => !!s.project.plan);
-  const { setPlan, setStep } = useProject.getState();
+  const { setPlan, setStep, startDrawing } = useProject.getState();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -114,6 +114,14 @@ export default function StepUpload({ onPlanReady }: Props) {
               e.target.value = '';
             }}
           />
+          {!pdf && (
+            <div className="draw-instead">
+              <p className="muted">Não tem a planta? Desenhe as paredes com as medidas da trena.</p>
+              <button className="btn" disabled={!!busy} onClick={startDrawing}>
+                Desenhar a planta
+              </button>
+            </div>
+          )}
           {busy && <p className="muted" role="status">{busy}</p>}
           {error && (
             <p className="error" role="alert">

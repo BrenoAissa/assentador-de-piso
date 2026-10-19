@@ -6,17 +6,21 @@ export const fmt = (v: number, digits = 1) =>
 export const fmtFixed = (v: number, digits: number) =>
   v.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
+/** Nome do encaixe das fileiras, no vocabulário da tela (Alinhado, Tijolinho, Escada). */
 export function patternLabel(layout: LayoutSpec): string {
-  if (layout.pattern === 'straight') return 'Reta';
+  if (layout.pattern === 'straight') return 'Alinhado';
   const { kind, value } = layout.runningOffset;
-  if (kind === 'cm') return `Amarração de ${fmt(value)} cm`;
-  const known: [number, string][] = [
-    [1 / 2, '1/2'],
-    [1 / 3, '1/3'],
-    [1 / 4, '1/4'],
-  ];
-  const hit = known.find(([f]) => Math.abs(f - value) < 1e-6);
-  return `Amarração ${hit ? hit[1] : `${fmt(value * 100, 0)}%`}`;
+  if (kind === 'cm') return `Deslocado ${fmt(value)} cm`;
+  if (Math.abs(value - 1 / 2) < 1e-6) return 'Tijolinho';
+  if (Math.abs(value - 1 / 3) < 1e-6) return 'Escada';
+  if (Math.abs(value - 1 / 4) < 1e-6) return 'Deslocado 1/4';
+  return `Deslocado ${fmt(value * 100, 0)}%`;
+}
+
+/** "peça deitada" / "peça em pé"; vazio para peça quadrada. */
+export function orientationLabel(tile: { lengthCm: number; widthCm: number }, layout: LayoutSpec): string {
+  if (Math.abs(tile.lengthCm - tile.widthCm) < 0.01) return '';
+  return layout.rotationDeg === 90 ? 'peça em pé' : 'peça deitada';
 }
 
 export const CUT_TYPE_LABEL: Record<CutType, string> = {

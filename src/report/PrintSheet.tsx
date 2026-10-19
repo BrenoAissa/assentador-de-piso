@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom';
 import { bbox } from '../geometry/polygon';
 import type { LayoutResult, RoomCm, TileSpec, LayoutSpec } from '../tiling/types';
-import { fmt, patternLabel } from '../ui/format';
+import { fmt, orientationLabel, patternLabel } from '../ui/format';
 import CutTable from './CutTable';
 import PlanSvg from './PlanSvg';
 import Summary from './Summary';
@@ -23,9 +23,10 @@ export default function PrintSheet({ result, rooms, tile, layout }: Props) {
     <div className="print-sheet">
       <h1>Paginação do piso</h1>
       <p>
-        Peça de {fmt(tile.lengthCm)} × {fmt(tile.widthCm)} cm, rejunte de {fmt(tile.jointMm)} mm,{' '}
-        {patternLabel(layout).toLowerCase()}, comprimento na {layout.rotationDeg === 90 ? 'vertical' : 'horizontal'} da
-        planta. Medidas dos recortes em cm, já descontado o rejunte.
+        Peça de {fmt(tile.lengthCm)} × {fmt(tile.widthCm)} cm, rejunte de {fmt(tile.jointMm)} mm, encaixe{' '}
+        {patternLabel(layout).toLowerCase()}
+        {orientationLabel(tile, layout) && `, ${orientationLabel(tile, layout)}`}. Medidas dos recortes em cm, já
+        descontado o rejunte. Peças tracejadas sem cor foram apagadas (móvel fixo, sem piso).
       </p>
       <svg viewBox={`${b.x - m} ${b.y - m} ${b.w + 2 * m} ${b.h + 2 * m}`}>
         <PlanSvg result={result} rooms={rooms} fontSize={font} showNumbers showCuts hairline={0.5} scalingStroke />

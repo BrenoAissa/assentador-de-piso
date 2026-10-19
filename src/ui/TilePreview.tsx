@@ -1,7 +1,7 @@
 import { tileRects } from '../tiling/grid';
 import type { LayoutSpec, TileSpec } from '../tiling/types';
 import { validateTile } from '../tiling/validate';
-import { fmt, patternLabel } from './format';
+import { fmt, orientationLabel, patternLabel } from './format';
 
 /** Amostra de 3 × 2 m mostrando a peça, o rejunte e a paginação escolhida. */
 export default function TilePreview({ tile, layout }: { tile: TileSpec; layout: LayoutSpec }) {
@@ -34,8 +34,8 @@ export default function TilePreview({ tile, layout }: { tile: TileSpec; layout: 
         <rect width={area.w} height={area.h} fill="none" stroke="#22262a" strokeWidth={2} />
       </svg>
       <figcaption className="muted">
-        Amostra de 3 × 2 m: peça de {fmt(tile.lengthCm)} × {fmt(tile.widthCm)} cm, {patternLabel(layout).toLowerCase()},
-        comprimento na {swap ? 'vertical' : 'horizontal'}.
+        Amostra de 3 × 2 m: peça de {fmt(tile.lengthCm)} × {fmt(tile.widthCm)} cm, {patternLabel(layout).toLowerCase()}
+        {orientationLabel(tile, layout) && `, ${orientationLabel(tile, layout)}`}.
       </figcaption>
     </figure>
   );

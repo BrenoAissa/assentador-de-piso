@@ -8,9 +8,9 @@ export interface PatternOption {
 }
 
 const PRESETS: { label: string; patch: Partial<LayoutSpec> }[] = [
-  { label: 'Reta', patch: { pattern: 'straight' } },
-  { label: 'Amarração 1/2', patch: { pattern: 'running', runningOffset: { kind: 'fraction', value: 1 / 2 } } },
-  { label: 'Amarração 1/3', patch: { pattern: 'running', runningOffset: { kind: 'fraction', value: 1 / 3 } } },
+  { label: 'Alinhado', patch: { pattern: 'straight' } },
+  { label: 'Tijolinho', patch: { pattern: 'running', runningOffset: { kind: 'fraction', value: 1 / 2 } } },
+  { label: 'Escada', patch: { pattern: 'running', runningOffset: { kind: 'fraction', value: 1 / 3 } } },
 ];
 
 /** Roda o motor com origem automática para cada paginação de referência. */

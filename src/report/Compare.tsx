@@ -24,7 +24,7 @@ export default function Compare() {
   }, [project]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!options) return <p className="muted">Calculando as três paginações…</p>;
+  if (!options) return <p className="muted">Calculando os três encaixes…</p>;
 
   const current = patternLabel(project.layout);
   const best = options.reduce((a, b) =>
@@ -37,11 +37,11 @@ export default function Compare() {
   return (
     <table className="cut-table compare-table">
       <caption className="muted">
-        Cada paginação usa o melhor ponto de partida para ela. Mesma peça, rejunte e direção.
+        Cada encaixe usa o melhor ponto de partida para ele, sem os seus ajustes manuais. Mesma peça, rejunte e direção.
       </caption>
       <thead>
         <tr>
-          <th scope="col">Paginação</th>
+          <th scope="col">Encaixe</th>
           <th scope="col">Inteiras</th>
           <th scope="col">Recortes</th>
           <th scope="col">Filetes</th>

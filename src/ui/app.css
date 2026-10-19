@@ -343,6 +343,7 @@ select {
 }
 
 .hint {
+  pointer-events: none;
   position: absolute;
   left: 12px;
   bottom: 12px;

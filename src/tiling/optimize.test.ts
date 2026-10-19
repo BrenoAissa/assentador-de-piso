@@ -52,9 +52,9 @@ describe('compareResults', () => {
 });
 
 describe('comparePatterns', () => {
-  it('compara reta, amarração 1/2 e amarração 1/3', () => {
+  it('compara alinhado, tijolinho e escada', () => {
     const res = comparePatterns(rooms, t, layout());
-    expect(res.map((r) => r.label)).toEqual(['Reta', 'Amarração 1/2', 'Amarração 1/3']);
+    expect(res.map((r) => r.label)).toEqual(['Alinhado', 'Tijolinho', 'Escada']);
     expect(res[1].layout.pattern).toBe('running');
     expect(res[2].layout.runningOffset).toEqual({ kind: 'fraction', value: 1 / 3 });
     for (const r of res) expect(r.result.pieces.length).toBeGreaterThan(0);

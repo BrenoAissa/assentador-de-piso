@@ -5,12 +5,9 @@ import { BoxGeometry, Color, ExtrudeGeometry, InstancedMesh, Matrix4, ShapeGeome
 import { bbox } from '../geometry/polygon';
 import { PIECE_FILL, pieceFill } from '../report/PlanSvg';
 import type { LayoutResult, Piece, RoomCm } from '../tiling/types';
-import { ringsToShapes, wallSegments } from './geometry';
+import { ringsToShapes, TILE_H, WALL_H, WALL_T, wallSegments } from './geometry';
 
 const INSTANCE_ABOVE = 3000;
-const WALL_H = 100;
-const WALL_T = 10;
-const TILE_H = 1;
 const SELECTED = '#f2c230';
 const FLAT = -Math.PI / 2;
 

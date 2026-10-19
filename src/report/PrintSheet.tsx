@@ -12,10 +12,12 @@ interface Props {
   rooms: RoomCm[];
   tile: TileSpec;
   layout: LayoutSpec;
+  /** Foto do piso em 3D visto de cima (data URL), gerada na hora de imprimir. */
+  topView?: string | null;
 }
 
 /** Folha de impressão: só aparece no papel (window.print). */
-export default function PrintSheet({ result, rooms, tile, layout }: Props) {
+export default function PrintSheet({ result, rooms, tile, layout, topView }: Props) {
   const b = bbox(rooms.map((r) => r.ring));
   const m = 20;
   const font = Math.min(tile.lengthCm, tile.widthCm) * 0.26;
@@ -37,6 +39,12 @@ export default function PrintSheet({ result, rooms, tile, layout }: Props) {
         amarelo: canto de partida da grade.
       </p>
       <Summary summary={result.summary} tile={tile} expanded />
+      {topView && (
+        <section className="print-3d">
+          <h2>Vista 3D de cima</h2>
+          <img src={topView} alt="Piso em 3D visto de cima" />
+        </section>
+      )}
       <CutTable result={result} rooms={rooms} />
     </div>,
     document.body,

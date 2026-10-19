@@ -2,6 +2,11 @@ import { Shape, Vector2 } from 'three';
 import { pointInPolygon } from '../geometry/polygon';
 import type { Ring } from '../geometry/types';
 
+/** Medidas da cena 3D, em cm. */
+export const WALL_H = 100;
+export const WALL_T = 10;
+export const TILE_H = 1;
+
 /**
  * Um Shape por anel. O y da planta vira −y do Shape: com a malha girada −90° em x,
  * o Shape deita no chão com a planta em x/z e a extrusão para cima.

@@ -50,4 +50,21 @@
   .print-sheet tr {
     break-inside: avoid;
   }
+
+  .print-sheet .print-3d {
+    break-before: page;
+    break-after: page;
+  }
+
+  .print-sheet .print-3d h2 {
+    font-size: 14pt;
+    margin-bottom: 6pt;
+  }
+
+  .print-sheet .print-3d img {
+    display: block;
+    width: 100%;
+    max-height: 240mm;
+    object-fit: contain;
+  }
 }

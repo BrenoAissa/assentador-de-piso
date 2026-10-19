@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { bbox, pointInPolygon, swapXY } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
 import CutTable from '../report/CutTable';
@@ -60,6 +61,8 @@ export default function StepResult() {
   const [preview, setPreview] = useState<LayoutResult | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [topView, setTopView] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
   const frame = useRef(0);
 
   useEffect(() => {
@@ -172,6 +175,26 @@ export default function StepResult() {
     if (order.every((c, i) => c === row[i].col)) return;
     setNotice(null);
     setEdits({ ...edits, rowOrder: { ...edits.rowOrder, [rowKey(piece.roomId, piece.row)]: order } });
+  };
+
+  /** Gera a vista 3D de cima, espera a imagem ficar pronta e só então abre a impressão. */
+  const printSheet = async () => {
+    if (!result) return;
+    setPrinting(true);
+    try {
+      const { renderTopView } = await import('../viewer3d/snapshot');
+      const url = renderTopView(result, rooms);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      flushSync(() => setTopView(url));
+    } catch {
+      // sem WebGL a folha sai sem a vista 3D, mas sai
+      flushSync(() => setTopView(null));
+    } finally {
+      setPrinting(false);
+    }
+    window.print();
   };
 
   const resetRow = (p: Piece) => {
@@ -344,14 +367,14 @@ export default function StepResult() {
             <button className="btn" onClick={() => setStep(3)}>
               Mudar o piso
             </button>
-            <button className="btn btn-primary" disabled={!result} onClick={() => window.print()}>
-              Imprimir para a obra
+            <button className="btn btn-primary" disabled={!result || printing} onClick={() => void printSheet()}>
+              {printing ? 'Preparando…' : 'Imprimir para a obra'}
             </button>
           </div>
         </footer>
       </aside>
 
-      {result && <PrintSheet result={result} rooms={rooms} tile={tile} layout={layout} />}
+      {result && <PrintSheet result={result} rooms={rooms} tile={tile} layout={layout} topView={topView} />}
     </div>
   );
 }

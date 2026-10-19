@@ -1,5 +1,5 @@
 import type { PatternOption } from './compare';
-import type { LayoutResult, LayoutSpec, RoomCm, TileSpec } from './types';
+import type { LayoutResult, LayoutSpec, ManualEdits, RoomCm, TileSpec } from './types';
 import type { TilingRequest } from './worker';
 
 let worker: Worker | null = null;
@@ -25,16 +25,16 @@ function getWorker(): Worker {
   return worker;
 }
 
-function call<T>(type: TilingRequest['type'], rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec): Promise<T> {
+function call<T>(type: TilingRequest['type'], rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits?: ManualEdits): Promise<T> {
   const id = nextId++;
   return new Promise<T>((resolve, reject) => {
     pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-    getWorker().postMessage({ id, type, rooms, tile, layout } satisfies TilingRequest);
+    getWorker().postMessage({ id, type, rooms, tile, layout, edits } satisfies TilingRequest);
   });
 }
 
-export const solveInWorker = (rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec) =>
-  call<LayoutResult>('solve', rooms, tile, layout);
+export const solveInWorker = (rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits?: ManualEdits) =>
+  call<LayoutResult>('solve', rooms, tile, layout, edits);
 
 export const compareInWorker = (rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec) =>
   call<PatternOption[]>('compare', rooms, tile, layout);

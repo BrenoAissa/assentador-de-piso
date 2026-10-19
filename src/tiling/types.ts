@@ -42,6 +42,8 @@ export type CutType = 'straight' | 'corner' | 'shaped';
 export interface Piece {
   /** Número exibido, único no projeto. */
   n: number;
+  /** Identidade na grade atual: `cômodo:fileira:coluna` (não muda ao reordenar a fileira). */
+  key: string;
   roomId: string;
   /** Fileira e posição na fileira, no referencial da paginação. */
   row: number;
@@ -56,15 +58,37 @@ export interface Piece {
   cutSize?: { w: number; h: number };
   /** Número da peça cuja sobra foi usada. */
   fromLeftoverOf?: number;
+  /** Apagada pelo usuário (móvel fixo, sem piso por baixo): fora da compra. */
+  removed?: boolean;
+  /** Marcada pelo usuário como embaixo de móvel: filete não conta como à vista. */
+  hidden?: boolean;
 }
+
+/** Ajustes manuais sobre a grade atual (somem quando a grade muda). */
+export interface ManualEdits {
+  /** Deslize extra, em cm ao longo da fileira, por `cômodo:fileira`. */
+  rowShift: Record<string, number>;
+  /** Nova ordem das peças (colunas originais) por `cômodo:fileira`. */
+  rowOrder: Record<string, number[]>;
+  /** Peças apagadas (`cômodo:fileira:coluna`). */
+  removed: string[];
+  /** Peças marcadas como embaixo de móvel. */
+  hidden: string[];
+}
+
+export const NO_EDITS: ManualEdits = { rowShift: {}, rowOrder: {}, removed: [], hidden: [] };
 
 export interface LayoutSummary {
   areaM2: number;
   full: number;
   /** Todas as recortadas, filetes incluídos. */
   cut: number;
-  /** Subconjunto de `cut`. */
+  /** Filetes à vista (subconjunto de `cut`, sem os marcados como embaixo de móvel). */
   slivers: number;
+  /** Filetes marcados como embaixo de móvel. */
+  hidden: number;
+  /** Peças apagadas pelo usuário. */
+  removed: number;
   fromLeftovers: number;
   /** Peças novas necessárias, sem a margem de perda. */
   newTiles: number;

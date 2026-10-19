@@ -4,23 +4,30 @@ import { classify } from './classify';
 import { clipRectToRing } from './clip';
 import { summarize } from './count';
 import { pitch, tileRects } from './grid';
+import { applyRowOrder, pieceKey, rowKey } from './edits';
 import { assignLeftovers } from './leftovers';
 import { optimizeOrigin } from './optimize';
-import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from './types';
+import { NO_EDITS, type LayoutResult, type LayoutSpec, type ManualEdits, type Piece, type RoomCm, type TileSpec } from './types';
 
 const MIN_AREA = 0.5;
 
 const swapPoint = (p: Point): Point => ({ x: p.y, y: p.x });
 
-/** Calcula a paginação com as origens dadas (referencial da planta, uma por cômodo). */
+/**
+ * Calcula a paginação com as origens dadas (referencial da planta, uma por cômodo) e os
+ * ajustes manuais (fileiras deslizadas, fileiras reordenadas, peças apagadas ou escondidas).
+ */
 export function computeLayout(
   rooms: RoomCm[],
   tile: TileSpec,
   layout: LayoutSpec,
   origins: Record<string, Point>,
+  edits: ManualEdits = NO_EDITS,
 ): LayoutResult {
   const swap = layout.rotationDeg === 90;
-  const { L, W } = pitch(tile);
+  const { L, W, joint } = pitch(tile);
+  const removed = new Set(edits.removed);
+  const hidden = new Set(edits.hidden);
   const pieces: Piece[] = [];
   const warnings: string[] = [];
   let floorArea = 0;
@@ -34,15 +41,43 @@ export function computeLayout(
     const ring = swap ? swapXY(room.ring) : room.ring;
     const o = origins[room.id] ?? { x: 0, y: 0 };
     const origin = swap ? swapPoint(o) : o;
-    for (const { r, c, rect } of tileRects(bbox(ring), origin, tile, layout)) {
+    const extra = (r: number) => edits.rowShift[rowKey(room.id, r)] ?? 0;
+    const roomPieces: Piece[] = [];
+    for (const { r, c, rect } of tileRects(bbox(ring), origin, tile, layout, extra)) {
       const shape = clipRectToRing(rect, ring).filter((s) => polygonArea(s) >= MIN_AREA);
       if (shape.length === 0) continue;
-      pieces.push({ n: 0, roomId: room.id, row: r, col: c, tileRect: rect, shape, ...classify(shape, rect, L, W, layout) });
+      const key = pieceKey(room.id, r, c);
+      roomPieces.push({
+        n: 0,
+        key,
+        roomId: room.id,
+        row: r,
+        col: c,
+        tileRect: rect,
+        shape,
+        ...classify(shape, rect, L, W, layout),
+        ...(removed.has(key) ? { removed: true } : {}),
+        ...(hidden.has(key) ? { hidden: true } : {}),
+      });
     }
+    // fileiras reordenadas à mão; a numeração segue a ordem física
+    const rows = new Map<number, Piece[]>();
+    for (const p of roomPieces) rows.set(p.row, [...(rows.get(p.row) ?? []), p]);
+    for (const [r, rowPieces] of rows) {
+      const order = edits.rowOrder[rowKey(room.id, r)];
+      if (order) applyRowOrder(rowPieces, order, joint);
+    }
+    roomPieces.sort((a, b) => a.row - b.row || bbox(a.shape).x - bbox(b.shape).x);
+    pieces.push(...roomPieces);
   }
 
   pieces.forEach((p, i) => (p.n = i + 1));
-  assignLeftovers(pieces, L, W, layout);
+  assignLeftovers(
+    pieces.filter((p) => !p.removed),
+    L,
+    W,
+    layout,
+  );
 
   if (swap) {
     for (const p of pieces) {
@@ -64,7 +99,7 @@ export function computeLayout(
 }
 
 /** Resolve a origem automática (global ou por cômodo) e calcula a paginação. */
-export function solveLayout(rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec): LayoutResult {
+export function solveLayout(rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits: ManualEdits = NO_EDITS): LayoutResult {
   const valid = rooms.filter((r) => isSimple(r.ring));
   const origins: Record<string, Point> = {};
   if (layout.gridMode === 'global') {
@@ -75,5 +110,5 @@ export function solveLayout(rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec)
       origins[r.id] = r.origin ?? (isSimple(r.ring) ? optimizeOrigin([r], tile, layout) : { x: 0, y: 0 });
     }
   }
-  return computeLayout(rooms, tile, layout, origins);
+  return computeLayout(rooms, tile, layout, origins, edits);
 }

@@ -1,7 +1,7 @@
 import type { Point, Ring } from './geometry/types';
-import { DEFAULT_LAYOUT, DEFAULT_TILE, type LayoutSpec, type TileSpec } from './tiling/types';
+import { DEFAULT_LAYOUT, DEFAULT_TILE, NO_EDITS, type LayoutSpec, type ManualEdits, type TileSpec } from './tiling/types';
 
-export type { LayoutSpec, TileSpec };
+export type { LayoutSpec, ManualEdits, TileSpec };
 
 export interface PlanImage {
   /** Chave da imagem no IndexedDB. */
@@ -41,6 +41,13 @@ export interface Project {
   rooms: Room[];
   tile: TileSpec;
   layout: LayoutSpec;
+  /** Ajustes manuais de fileiras e peças sobre a grade atual. */
+  edits: ManualEdits;
+}
+
+/** Projetos salvos antes dos ajustes manuais não têm `edits`. */
+export function normalizeProject(p: Project): Project {
+  return { ...p, edits: p.edits ?? NO_EDITS };
 }
 
 export function emptyProject(): Project {
@@ -51,5 +58,6 @@ export function emptyProject(): Project {
     rooms: [],
     tile: { ...DEFAULT_TILE },
     layout: { ...DEFAULT_LAYOUT },
+    edits: NO_EDITS,
   };
 }

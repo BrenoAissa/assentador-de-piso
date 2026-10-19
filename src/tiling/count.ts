@@ -8,13 +8,18 @@ export function piecesPerBox(tile: TileSpec): number {
   return 1;
 }
 
-export function summarize(pieces: Piece[], tile: TileSpec, floorAreaCm2: number): LayoutSummary {
+export function summarize(all: Piece[], tile: TileSpec, floorAreaCm2: number): LayoutSummary {
+  const pieces = all.filter((p) => !p.removed);
   let full = 0;
   let slivers = 0;
+  let hidden = 0;
   let fromLeftovers = 0;
   for (const p of pieces) {
     if (p.kind === 'full') full++;
-    if (p.kind === 'sliver') slivers++;
+    if (p.kind === 'sliver') {
+      if (p.hidden) hidden++;
+      else slivers++;
+    }
     if (p.fromLeftoverOf !== undefined) fromLeftovers++;
   }
   const newTiles = pieces.length - fromLeftovers;
@@ -26,6 +31,8 @@ export function summarize(pieces: Piece[], tile: TileSpec, floorAreaCm2: number)
     full,
     cut: pieces.length - full,
     slivers,
+    hidden,
+    removed: all.length - pieces.length,
     fromLeftovers,
     newTiles,
     tilesToBuy,

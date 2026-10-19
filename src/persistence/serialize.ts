@@ -1,4 +1,4 @@
-import type { Project } from '../types';
+import { normalizeProject, type Project } from '../types';
 
 interface ProjectFile {
   app: 'paginador-piso';
@@ -43,5 +43,5 @@ export async function parseProject(json: string): Promise<{ project: Project; im
   if (file?.app !== 'paginador-piso' || p?.version !== 1 || !Array.isArray(p.rooms) || !p.tile || !p.layout) {
     throw new Error('Arquivo de projeto inválido.');
   }
-  return { project: p, image: file.image ? base64ToBlob(file.image.base64, file.image.type) : null };
+  return { project: normalizeProject(p), image: file.image ? base64ToBlob(file.image.base64, file.image.type) : null };
 }

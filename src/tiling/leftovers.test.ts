@@ -7,6 +7,7 @@ import type { Piece } from './types';
 function cutX(n: number, w: number): Piece {
   return {
     n,
+    key: `a:${n}:0`,
     roomId: 'a',
     row: n,
     col: 0,

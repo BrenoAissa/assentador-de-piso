@@ -1,11 +1,21 @@
 import { create } from 'zustand';
 import { deleteImage, loadImage, loadProject, saveImage, saveProject } from '../persistence/db';
-import type { LayoutResult } from '../tiling/types';
+import { NO_EDITS, type LayoutResult, type ManualEdits } from '../tiling/types';
 import { emptyProject, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
+import { layoutChangeResetsEdits, pushHistory } from './edits';
 import { computeIssues, type Step } from './issues';
+
+/** Estado que "Desfazer" restaura. */
+interface Snapshot {
+  tile: TileSpec;
+  layout: LayoutSpec;
+  edits: ManualEdits;
+}
 
 interface ProjectState {
   project: Project;
+  /** Passos para desfazer (só na sessão). */
+  history: Snapshot[];
   step: Step;
   planUrl: string | null;
   planBlob: Blob | null;
@@ -21,7 +31,11 @@ interface ProjectState {
   updateRoom(id: string, patch: Partial<Room>): void;
   removeRoom(id: string): void;
   setTile(patch: Partial<TileSpec>): void;
+  /** Muda o layout; mudanças que mexem na grade desfazem os ajustes manuais (e entram no histórico). */
   setLayout(patch: Partial<LayoutSpec>): void;
+  /** Troca os ajustes manuais, guardando o passo anterior no histórico. */
+  setEdits(edits: ManualEdits): void;
+  undo(): void;
   setStep(s: Step): void;
   selectRoom(id: string | null): void;
   setResult(r: LayoutResult | null): void;
@@ -38,6 +52,11 @@ export const useProject = create<ProjectState>((set, get) => {
   /** Toda mudança do projeto passa por aqui e invalida o resultado. */
   const update = (fn: (p: Project) => Project) => set((s) => ({ project: fn(s.project), result: null }));
 
+  const remember = () => {
+    const { tile, layout, edits } = get().project;
+    set((s) => ({ history: pushHistory(s.history, { tile, layout, edits }) }));
+  };
+
   const showImage = (blob: Blob | null) => {
     const prev = get().planUrl;
     if (prev) URL.revokeObjectURL(prev);
@@ -46,6 +65,7 @@ export const useProject = create<ProjectState>((set, get) => {
 
   return {
     project: emptyProject(),
+    history: [],
     step: 1,
     planUrl: null,
     planBlob: null,
@@ -59,8 +79,8 @@ export const useProject = create<ProjectState>((set, get) => {
       await saveImage(imageId, blob);
       if (old) void deleteImage(old.imageId);
       showImage(blob);
-      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [] }));
-      set({ selectedRoomId: null });
+      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS }));
+      set({ selectedRoomId: null, history: [] });
     },
 
     setScale(scale) {
@@ -103,11 +123,26 @@ export const useProject = create<ProjectState>((set, get) => {
     },
 
     setTile(patch) {
-      update((p) => ({ ...p, tile: { ...p.tile, ...patch } }));
+      update((p) => ({ ...p, tile: { ...p.tile, ...patch }, edits: NO_EDITS }));
     },
 
     setLayout(patch) {
-      update((p) => ({ ...p, layout: { ...p.layout, ...patch } }));
+      const resets = layoutChangeResetsEdits(patch);
+      if (resets) remember();
+      update((p) => ({ ...p, layout: { ...p.layout, ...patch }, edits: resets ? NO_EDITS : p.edits }));
+    },
+
+    setEdits(edits) {
+      remember();
+      update((p) => ({ ...p, edits }));
+    },
+
+    undo() {
+      const h = get().history;
+      if (h.length === 0) return;
+      const last = h[h.length - 1];
+      set({ history: h.slice(0, -1) });
+      update((p) => ({ ...p, ...last }));
     },
 
     setStep(step) {
@@ -145,7 +180,7 @@ export const useProject = create<ProjectState>((set, get) => {
         plan = null;
       }
       showImage(plan ? image : null);
-      set({ project: { ...project, plan }, result: null, selectedRoomId: null, step: plan ? 2 : 1 });
+      set({ project: { ...project, plan }, result: null, selectedRoomId: null, history: [], step: plan ? 2 : 1 });
     },
   };
 });

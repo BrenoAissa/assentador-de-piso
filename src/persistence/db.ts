@@ -1,5 +1,5 @@
 import { del, get, set } from 'idb-keyval';
-import type { Project } from '../types';
+import { normalizeProject, type Project } from '../types';
 
 const PROJECT_KEY = 'project';
 const imageKey = (id: string) => `image:${id}`;
@@ -10,7 +10,7 @@ export async function saveProject(p: Project): Promise<void> {
 
 export async function loadProject(): Promise<Project | null> {
   const p = await get<Project>(PROJECT_KEY);
-  return p && p.version === 1 ? p : null;
+  return p && p.version === 1 ? normalizeProject(p) : null;
 }
 
 export async function saveImage(id: string, blob: Blob): Promise<void> {

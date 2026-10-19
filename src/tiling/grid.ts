@@ -28,8 +28,17 @@ export interface TileSlot {
   rect: Rect;
 }
 
-/** Retângulos das peças inteiras que tocam `bounds`, em ordem de fileira e depois de posição. */
-export function tileRects(bounds: Rect, origin: Point, tile: TileSpec, layout: LayoutSpec): TileSlot[] {
+/**
+ * Retângulos das peças inteiras que tocam `bounds`, em ordem de fileira e depois de posição.
+ * `extraShift(r)` desliza uma fileira além do padrão (ajuste manual).
+ */
+export function tileRects(
+  bounds: Rect,
+  origin: Point,
+  tile: TileSpec,
+  layout: LayoutSpec,
+  extraShift: (r: number) => number = () => 0,
+): TileSlot[] {
   const { L, W, px, py } = pitch(tile);
   const out: TileSlot[] = [];
   const x1 = bounds.x + bounds.w;
@@ -39,7 +48,7 @@ export function tileRects(bounds: Rect, origin: Point, tile: TileSpec, layout: L
   for (let r = rStart; r <= rEnd; r++) {
     const y = origin.y + r * py;
     if (y + W <= bounds.y || y >= y1) continue;
-    const s = rowShift(r, layout, px);
+    const s = rowShift(r, layout, px) + extraShift(r);
     const cStart = Math.floor((bounds.x - origin.x - s) / px) - 1;
     const cEnd = Math.ceil((x1 - origin.x - s) / px);
     for (let c = cStart; c <= cEnd; c++) {

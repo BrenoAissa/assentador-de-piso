@@ -62,7 +62,8 @@ export async function loadPlan(file: File): Promise<LoadedPlan> {
       const ctx = canvas.getContext('2d')!;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+      // intent 'print': o pdf.js não usa requestAnimationFrame, que trava com a aba em segundo plano
+      await page.render({ canvas, canvasContext: ctx, viewport, intent: 'print' }).promise;
       return { blob: await canvasToBlob(canvas), width: canvas.width, height: canvas.height };
     },
   };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchRoomName, parseArea, parseDims } from './ocrParse';
+import { matchRoomName, parseArea, parseDims, parseLinear } from './ocrParse';
 
 describe('parseDims', () => {
   it('lê medidas com vírgula, ponto, x e ×', () => {
@@ -23,6 +23,23 @@ describe('parseArea', () => {
 
   it('ignora textos sem área', () => {
     expect(parseArea('3,20 x 4,50')).toBeNull();
+  });
+});
+
+describe('parseLinear', () => {
+  it('lê cotas lineares em metros', () => {
+    expect(parseLinear('3.31')).toBe(3.31);
+    expect(parseLinear('2,41')).toBe(2.41);
+    expect(parseLinear('(0.96)')).toBe(0.96);
+    expect(parseLinear('1.20m')).toBe(1.2);
+  });
+
+  it('ignora o que não é cota linear', () => {
+    expect(parseLinear('12,5 m²')).toBeNull();
+    expect(parseLinear('1:100')).toBeNull();
+    expect(parseLinear('2021')).toBeNull();
+    expect(parseLinear('3,20 x 4,50')).toBeNull();
+    expect(parseLinear('3.3')).toBeNull();
   });
 });
 

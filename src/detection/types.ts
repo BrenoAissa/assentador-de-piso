@@ -24,10 +24,18 @@ export interface CvResult {
   warnings: string[];
 }
 
+export interface LinearDim {
+  valueM: number;
+  /** Texto girado (cota vertical na planta). */
+  vertical: boolean;
+}
+
 export interface DetectedRoom extends CvRoom {
   name?: string;
   dims?: { a: number; b: number };
   areaM2?: number;
+  /** Cotas lineares lidas dentro do cômodo (ex.: 3.31). */
+  linear?: LinearDim[];
   scaleMismatch?: boolean;
 }
 

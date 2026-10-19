@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { bbox } from '../geometry/polygon';
 import type { Point, Ring } from '../geometry/types';
 import { useProject } from '../store/project';
@@ -39,7 +39,16 @@ export default function PlanEditor() {
   const plan = project.plan!;
 
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { view, setView, toWorld, toScreen, fit } = usePanZoom(wrapRef, plan.widthPx, plan.heightPx, fitToken);
+  // com cômodos, enquadra só eles (a planta pode ser pequena no meio de uma folha cheia de logotipos)
+  const hasRooms = project.rooms.length > 0;
+  const focus = useMemo(() => {
+    if (!hasRooms) return undefined;
+    const b = bbox(project.rooms.map((r) => r.polygonPx));
+    const m = 0.08 * Math.max(b.w, b.h);
+    return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m };
+    // só reenquadra quando aparecem ou somem cômodos, não a cada vértice arrastado
+  }, [hasRooms, plan.imageId, fitToken]);
+  const { view, setView, toWorld, toScreen, fit } = usePanZoom(wrapRef, plan.widthPx, plan.heightPx, fitToken, focus);
 
   const [drag, setDrag] = useState<Drag>(null);
   const [draft, setDraft] = useState<{ roomId: string; ring: Ring } | null>(null);

@@ -12,6 +12,14 @@ export function parseArea(s: string): number | null {
   return m ? num(m[1]) : null;
 }
 
+/** Cota linear isolada, como "3.31" ou "2,41" (metros, sempre com 2 casas). */
+export function parseLinear(s: string): number | null {
+  const m = s.trim().match(/^\(?(\d{1,2}[.,]\d{2})\)?\s*m?$/i);
+  if (!m) return null;
+  const v = num(m[1]);
+  return v > 0 && v <= 30 ? v : null;
+}
+
 const RULES: [RegExp, string | ((m: RegExpMatchArray) => string)][] = [
   [/\blavabo\b/, 'Lavabo'],
   [/(^|[^a-z])(banho|banheiro|bwc|wc|w\.\s*c\.?)([^a-z]|$)/, 'Banheiro'],

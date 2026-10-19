@@ -1,25 +1,30 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Point } from '../geometry/types';
+import type { Point, Rect } from '../geometry/types';
 
 export type View = { k: number; tx: number; ty: number };
 
 /**
  * Zoom com a roda (em torno do cursor) e enquadramento de um conteúdo de `w × h` unidades
- * dentro do elemento. A conversão tela → conteúdo fica em `toWorld`.
+ * dentro do elemento. `focus` é a parte do conteúdo a enquadrar (padrão: tudo). A conversão
+ * tela → conteúdo fica em `toWorld`.
  */
-export function usePanZoom(ref: RefObject<HTMLElement | null>, w: number, h: number, fitToken = 0) {
+export function usePanZoom(ref: RefObject<HTMLElement | null>, w: number, h: number, fitToken = 0, focus?: Rect) {
   const [view, setView] = useState<View>({ k: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
+  const fx = focus?.x ?? 0;
+  const fy = focus?.y ?? 0;
+  const fw = focus?.w ?? w;
+  const fh = focus?.h ?? h;
 
   const fit = useCallback(() => {
     const el = ref.current;
-    if (!el || w <= 0 || h <= 0) return;
+    if (!el || fw <= 0 || fh <= 0) return;
     const { width, height } = el.getBoundingClientRect();
     if (width === 0 || height === 0) return;
-    const k = Math.min(width / w, height / h) * 0.92;
-    setView({ k, tx: (width - w * k) / 2, ty: (height - h * k) / 2 });
-  }, [ref, w, h]);
+    const k = Math.min(width / fw, height / fh) * 0.92;
+    setView({ k, tx: (width - fw * k) / 2 - fx * k, ty: (height - fh * k) / 2 - fy * k });
+  }, [ref, fx, fy, fw, fh]);
 
   useEffect(() => {
     fit();

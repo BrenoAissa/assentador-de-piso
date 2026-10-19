@@ -56,6 +56,7 @@ export default function PlanEditor() {
   const tools = TOOL_LIST.filter((t) => !(drawn && t.id === 'calibrate'));
 
   const wrapRef = useRef<HTMLDivElement>(null);
+  const lengthRef = useRef<HTMLInputElement>(null);
   // com cômodos, enquadra só eles (a planta pode ser pequena no meio de uma folha cheia de logotipos)
   const hasRooms = project.rooms.length > 0;
   const focus = useMemo(() => {
@@ -90,6 +91,11 @@ export default function PlanEditor() {
     setSelVertex(null);
   }, [tool]);
 
+  // o campo de medida fica em foco enquanto se desenha (funciona também com teclado de celular)
+  useEffect(() => {
+    if (tool === 'draw' && drawPts.length > 0) lengthRef.current?.focus();
+  }, [tool, drawPts.length]);
+
   /** Ponto do desenho: grade no primeiro clique, ângulo reto e cm inteiros nos seguintes. */
   const drawPoint = (raw: Point, free: boolean): Point => {
     if (drawPts.length === 0) return drawn ? snapToGrid(raw, GRID_CM) : raw;
@@ -121,11 +127,6 @@ export default function PlanEditor() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e)) return;
-      if (tool === 'draw' && drawPts.length > 0 && pxPerCm && /^[0-9.,]$/.test(e.key)) {
-        e.preventDefault();
-        setTyped((t) => (t.length < 7 ? t + e.key : t));
-        return;
-      }
       if (e.key === 'Escape') {
         setDrawPts([]);
         setTyped('');
@@ -462,6 +463,42 @@ export default function PlanEditor() {
           )}
         </g>
       </svg>
+
+      {tool === 'draw' && drawPts.length > 0 && pxPerCm && (
+        <form
+          className="popover length-field"
+          style={{ left: 12, top: 60 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (typed) placeTyped();
+            else finishDrawing(drawPts);
+          }}
+        >
+          <label className="field">
+            <span>Próxima parede (cm)</span>
+            <input
+              ref={lengthRef}
+              className="input"
+              inputMode="decimal"
+              value={typed}
+              placeholder="ex.: 320"
+              onChange={(e) => setTyped(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7))}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setDrawPts([]);
+                  setTyped('');
+                } else if (e.key === 'Backspace' && !typed) {
+                  e.preventDefault();
+                  setDrawPts(drawPts.slice(0, -1));
+                }
+              }}
+            />
+          </label>
+          <p className="muted">
+            Aponte a direção com o mouse e aperte Enter. {drawPts.length >= 3 ? 'Enter com o campo vazio fecha o cômodo.' : ''}
+          </p>
+        </form>
+      )}
 
       {badgeAt && (pxPerCm || typed) && (
         <div className={`measure-badge${typed ? ' typing' : ''}`} style={{ left: badgeAt.x, top: badgeAt.y }}>

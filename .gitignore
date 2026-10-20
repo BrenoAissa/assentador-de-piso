@@ -5,3 +5,8 @@ dist
 *.tsbuildinfo
 .vite
 planta-real/
+
+# arquivos locais
+.claude/settings.local.json
+*.traineddata
+.vercel

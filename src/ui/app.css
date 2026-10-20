@@ -319,6 +319,10 @@ select {
   width: 100%;
   height: 100%;
   user-select: none;
+  -webkit-user-select: none;
+  /* iPhone: segurar o dedo não abre lupa nem menu */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .panel {
@@ -425,10 +429,21 @@ select {
   border-color: var(--grafite-2);
 }
 
-.draw-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+.measure-row {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 6px;
+  align-items: end;
+}
+
+.undo-point {
+  height: 38px;
+  padding: 0;
+}
+
+.undo-point svg {
+  width: 20px;
+  height: 20px;
 }
 
 .vertex-delete {
@@ -1476,6 +1491,19 @@ select {
 
   .draw-panel {
     top: 58px;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  /* painel de medida enxuto no celular: a planta precisa de espaço para o dedo */
+  .draw-panel .draw-name,
+  .draw-panel .draw-tip,
+  .measure-row .field > span:first-child {
+    display: none;
+  }
+
+  .undo-point {
+    height: 44px;
   }
 
   .btn.dir {

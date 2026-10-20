@@ -104,12 +104,24 @@ export function usePanZoom(ref: RefObject<HTMLElement | null>, w: number, h: num
       e.stopPropagation();
       if (touches.size === 0) pinch = null;
     };
+    // Safari (iPhone): sem isto, dois dedos ou arrastar sobre a planta dão zoom ou rolam a página inteira
+    const blockGesture = (e: Event) => e.preventDefault();
+    const blockTouchMove = (e: TouchEvent) => {
+      if ((e.target as Element | null)?.closest('input, textarea, select')) return;
+      if (e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('gesturestart', blockGesture);
+    el.addEventListener('gesturechange', blockGesture);
+    el.addEventListener('touchmove', blockTouchMove, { passive: false });
     const opts = { capture: true };
     el.addEventListener('pointerdown', down, opts);
     el.addEventListener('pointermove', move, opts);
     el.addEventListener('pointerup', up, opts);
     el.addEventListener('pointercancel', up, opts);
     return () => {
+      el.removeEventListener('gesturestart', blockGesture);
+      el.removeEventListener('gesturechange', blockGesture);
+      el.removeEventListener('touchmove', blockTouchMove);
       el.removeEventListener('pointerdown', down, opts);
       el.removeEventListener('pointermove', move, opts);
       el.removeEventListener('pointerup', up, opts);

@@ -12,12 +12,15 @@ import { FitButton, MagnetButton } from '../ui/CanvasButtons';
 import Hint, { isTouch } from '../ui/Hint';
 
 type Drag =
-  | { kind: 'pan'; start: Point; view: View }
+  /** `tap`: no desenho e na calibragem, soltar sem arrastar põe o ponto; arrastar move a vista. */
+  | { kind: 'pan'; start: Point; view: View; tap?: boolean; moved?: boolean }
   | { kind: 'vertex'; roomId: string; index: number; moved: boolean }
   | { kind: 'move'; roomId: string; start: Point; screen: Point; base: Ring; moved: boolean }
   | null;
 
 const CLOSE_PX = 12;
+/** Até quantos px de tela o dedo (ou o mouse) pode escorregar e ainda contar como toque. */
+const TAP_PX = 8;
 /** Espessura de parede usada para encaixar cômodos vizinhos. */
 const WALL_GAP_CM = 15;
 /** Grade de encaixe no projeto desenhado. */
@@ -43,7 +46,7 @@ const HINTS: Record<Tool, string> = {
 const TOUCH_HINTS: Partial<Record<Tool, string>> = {
   select:
     'Toque num cômodo para selecionar. Com ele selecionado, arraste para mudar de lugar ou arraste os pontos para ajustar. Arraste o fundo para mover a vista e use dois dedos para aproximar.',
-  draw: 'Toque onde a parede começa (ou em Começar). Digite a medida e toque na seta da direção. Feche no primeiro ponto ou em Fechar cômodo.',
+  draw: 'Toque para pôr um ponto; arraste com um dedo para mover a planta e use dois dedos para aproximar. Ou toque no campo, digite a medida e use as setas. Feche no primeiro ponto ou em Fechar cômodo.',
   calibrate: 'Toque nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
 };
 
@@ -123,9 +126,10 @@ export default function PlanEditor() {
     setSelVertex(null);
   }, [tool]);
 
-  // o campo de medida fica em foco enquanto se desenha (funciona também com teclado de celular)
+  // no computador, o campo de medida fica em foco enquanto se desenha; no celular, focar sozinho
+  // abriria o teclado (e no iPhone rolaria a tela) a cada ponto: lá a pessoa toca no campo quando quer
   useEffect(() => {
-    if (tool === 'draw' && drawPts.length > 0) lengthRef.current?.focus();
+    if (!touch && tool === 'draw' && drawPts.length > 0) lengthRef.current?.focus();
   }, [tool, drawPts.length]);
 
   const tolW = 10 / view.k;
@@ -168,19 +172,36 @@ export default function PlanEditor() {
     requestFit();
   };
 
-  // a vista acompanha o desenho: o último ponto fica à vista, fora do painel de medida
-  useEffect(() => {
+  /**
+   * Traz o ponto para a vista (fora do painel de medida) quando ele nasce das setas ou do
+   * "Começar ao lado". Um ponto tocado já está à vista: mexer na vista ali brigaria com o dedo.
+   */
+  const reveal = (pt: Point) => {
     const el = wrapRef.current;
-    if (tool !== 'draw' || drawPts.length === 0 || !el) return;
+    if (!el) return;
     const r = el.getBoundingClientRect();
     const panel = el.querySelector<HTMLElement>('.draw-panel');
     const top = panel && panel.offsetWidth > r.width * 0.6 ? panel.offsetTop + panel.offsetHeight : 0;
-    const p = toScreen(drawPts[drawPts.length - 1]);
+    const p = toScreen(pt);
     const m = 48;
     if (p.x < m || p.x > r.width - m || p.y < top + m || p.y > r.height - m) {
       setView((v) => ({ ...v, tx: v.tx + r.width / 2 - p.x, ty: v.ty + (top + r.height) / 2 - p.y }));
     }
-  }, [tool, drawPts]);
+  };
+
+  /** Ponto tocado (ou clicado) no desenho; perto do primeiro ponto, fecha o cômodo. */
+  const placeDrawPoint = (p: Point, free: boolean) => {
+    if (drawPts.length >= 3) {
+      const first = toScreen(drawPts[0]);
+      const here = toScreen(p);
+      if (Math.hypot(first.x - here.x, first.y - here.y) < CLOSE_PX * (touch ? 2 : 1)) return finishDrawing(drawPts);
+    }
+    const sp = drawPoint(p, free).point;
+    const first = drawPts[0];
+    if (first && drawPts.length >= 3 && Math.hypot(sp.x - first.x, sp.y - first.y) < 0.01) return finishDrawing(drawPts);
+    setDrawPts([...drawPts, sp]);
+    setTyped('');
+  };
 
   /** Parede com o comprimento digitado, na direção para onde o mouse aponta (sem mouse, use as setas). */
   const placeTyped = () => {
@@ -201,12 +222,15 @@ export default function PlanEditor() {
     if (drawPts.length >= 3 && Math.hypot(next.x - first.x, next.y - first.y) < 0.5 * pxPerCm) return finishDrawing(drawPts);
     setDrawPts([...drawPts, next]);
     setTyped('');
+    reveal(next);
   };
 
   /** Primeiro ponto sem tocar na planta: ao lado dos cômodos que já existem, ou no canto da folha. */
   const startBeside = () => {
     const rings = otherRings();
-    setDrawPts([rings.length ? placeBeside(rings, WALL_GAP_CM * (pxPerCm ?? 1)) : { x: 100, y: 100 }]);
+    const at = rings.length ? placeBeside(rings, WALL_GAP_CM * (pxPerCm ?? 1)) : { x: 100, y: 100 };
+    setDrawPts([at]);
+    reveal(at);
   };
 
   const undoPoint = () => {
@@ -257,23 +281,10 @@ export default function PlanEditor() {
 
     if (e.button === 1 || e.button === 2) return startPan();
 
-    if (tool === 'draw') {
-      if (drawPts.length >= 3) {
-        const first = toScreen(drawPts[0]);
-        const here = toScreen(p);
-        if (Math.hypot(first.x - here.x, first.y - here.y) < CLOSE_PX) return finishDrawing(drawPts);
-      }
-      const sp = drawPoint(p, isFree(e)).point;
-      const first = drawPts[0];
-      if (first && drawPts.length >= 3 && Math.hypot(sp.x - first.x, sp.y - first.y) < 0.01) return finishDrawing(drawPts);
-      setDrawPts([...drawPts, sp]);
-      touchPoint.current = e.pointerType === 'touch' ? e.pointerId : null;
-      setTyped('');
-      return;
-    }
-
-    if (tool === 'calibrate') {
-      setCalib(calib.length >= 2 ? [p] : [...calib, p]);
+    // desenho e calibragem: o ponto só nasce ao soltar sem arrastar (onPointerUp); arrastar move a vista
+    if (tool === 'draw' || tool === 'calibrate') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDrag({ kind: 'pan', start: { x: e.clientX, y: e.clientY }, view, tap: true });
       return;
     }
 
@@ -311,7 +322,13 @@ export default function PlanEditor() {
 
   const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
     if (drag?.kind === 'pan') {
-      setView({ ...drag.view, tx: drag.view.tx + e.clientX - drag.start.x, ty: drag.view.ty + e.clientY - drag.start.y });
+      const dx = e.clientX - drag.start.x;
+      const dy = e.clientY - drag.start.y;
+      if (drag.tap && !drag.moved) {
+        if (Math.hypot(dx, dy) < TAP_PX) return;
+        setDrag({ ...drag, moved: true });
+      }
+      setView({ ...drag.view, tx: drag.view.tx + dx, ty: drag.view.ty + dy });
       return;
     }
     const p = toWorld(e.clientX, e.clientY);
@@ -342,19 +359,19 @@ export default function PlanEditor() {
     } else if (tool !== 'select') setHover(p);
   };
 
-  /** Toque que pôs o último ponto do desenho: se virar pinça (zoom), o ponto sai. */
-  const touchPoint = useRef<number | null>(null);
-
-  const onPointerCancel = (e: RPointerEvent<SVGSVGElement>) => {
-    if (tool === 'draw' && touchPoint.current === e.pointerId) setDrawPts((pts) => pts.slice(0, -1));
-    touchPoint.current = null;
+  /** Gesto interrompido (virou pinça com dois dedos): nada é criado nem salvo. */
+  const onPointerCancel = () => {
     setSnapInfo({ kind: null, guides: [] });
     setDraft(null);
     setDrag(null);
   };
 
-  const onPointerUp = () => {
-    touchPoint.current = null;
+  const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
+    if (drag?.kind === 'pan' && drag.tap && !drag.moved) {
+      const p = toWorld(e.clientX, e.clientY);
+      if (tool === 'draw') placeDrawPoint(p, isFree(e));
+      else if (tool === 'calibrate') setCalib(calib.length >= 2 ? [p] : [...calib, p]);
+    }
     setSnapInfo({ kind: null, guides: [] });
     if ((drag?.kind === 'vertex' || drag?.kind === 'move') && draft && drag.moved) {
       updateRoom(draft.roomId, { polygonPx: draft.ring });
@@ -631,7 +648,7 @@ export default function PlanEditor() {
         >
           {drawPts.length === 0 ? (
             <>
-              <label className="field">
+              <label className="field draw-name">
                 <span>Nome do cômodo (opcional)</span>
                 <input className="input" value={drawName} onChange={(e) => setDrawName(e.target.value)} placeholder="ex.: Sala" />
               </label>
@@ -644,34 +661,41 @@ export default function PlanEditor() {
             </>
           ) : (
             <>
-              <label className="field">
-                <span>Medida da próxima parede</span>
-                <span className="input-wrap">
-                  <input
-                    ref={lengthRef}
-                    className="input"
-                    inputMode="decimal"
-                    enterKeyHint="done"
-                    value={typed}
-                    placeholder="ex.: 320"
-                    onChange={(e) => setTyped(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7))}
-                    onKeyDown={(e) => {
-                      const dir = DIRS.find((d) => d.key === e.key);
-                      if (dir && typed) {
-                        e.preventDefault();
-                        addWall(dir.d);
-                      } else if (e.key === 'Escape') {
-                        setDrawPts([]);
-                        setTyped('');
-                      } else if (e.key === 'Backspace' && !typed) {
-                        e.preventDefault();
-                        undoPoint();
-                      }
-                    }}
-                  />
-                  <span className="suffix">cm</span>
-                </span>
-              </label>
+              <div className="measure-row">
+                <label className="field">
+                  <span>Medida da próxima parede</span>
+                  <span className="input-wrap">
+                    <input
+                      ref={lengthRef}
+                      className="input"
+                      inputMode="decimal"
+                      enterKeyHint="done"
+                      value={typed}
+                      placeholder="ex.: 320"
+                      onChange={(e) => setTyped(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7))}
+                      onKeyDown={(e) => {
+                        const dir = DIRS.find((d) => d.key === e.key);
+                        if (dir && typed) {
+                          e.preventDefault();
+                          addWall(dir.d);
+                        } else if (e.key === 'Escape') {
+                          setDrawPts([]);
+                          setTyped('');
+                        } else if (e.key === 'Backspace' && !typed) {
+                          e.preventDefault();
+                          undoPoint();
+                        }
+                      }}
+                    />
+                    <span className="suffix">cm</span>
+                  </span>
+                </label>
+                <button type="button" className="btn undo-point" onPointerDown={keepFocus} onClick={undoPoint} aria-label="Desfazer o último ponto" title="Desfazer o último ponto">
+                  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                    <path d="M7 5 3 9l4 4M3.5 9H12a5 5 0 0 1 0 10H9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
               <div className="dir-pad" role="group" aria-label="Direção da parede">
                 {DIRS.map((d) => (
                   <button
@@ -687,17 +711,12 @@ export default function PlanEditor() {
                   </button>
                 ))}
               </div>
-              <p className="muted">{typed ? 'Toque na seta da direção da parede.' : 'Digite a medida e toque na seta da direção.'}</p>
-              <div className="draw-actions">
-                <button type="button" className="btn btn-sm" onPointerDown={keepFocus} onClick={undoPoint}>
-                  Desfazer
+              <p className="muted draw-tip">{typed ? 'Toque na seta da direção da parede.' : 'Digite a medida e toque na seta da direção.'}</p>
+              {drawPts.length >= 3 && (
+                <button type="button" className="btn btn-sm btn-primary" onPointerDown={keepFocus} onClick={() => finishDrawing(drawPts)}>
+                  Fechar cômodo
                 </button>
-                {drawPts.length >= 3 && (
-                  <button type="button" className="btn btn-sm btn-primary" onPointerDown={keepFocus} onClick={() => finishDrawing(drawPts)}>
-                    Fechar cômodo
-                  </button>
-                )}
-              </div>
+              )}
             </>
           )}
         </form>

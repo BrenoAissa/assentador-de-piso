@@ -2,7 +2,7 @@ import { rectRing } from './editor/drawing';
 import type { Point, Ring } from './geometry/types';
 import { drawnPlan, emptyProject, type Project, type Room } from './types';
 
-/** Nome da "planta" do apartamento de exemplo; o Resultado usa para mostrar o aviso de exemplo. */
+/** Nome da "planta" do lar de exemplo; o Resultado usa para mostrar o aviso de exemplo. */
 export const SAMPLE_SOURCE = 'Exemplo';
 
 /**
@@ -25,7 +25,7 @@ const room = (id: string, name: string, ring: Ring, receivesTile = true): Room =
 });
 
 /**
- * Apartamento de exemplo, desenhado em cm com paredes de 15 cm: dois quartos, sala integrada
+ * Lar de exemplo, desenhado em cm com paredes de 15 cm: dois quartos, sala integrada
  * com a cozinha (em L), área de serviço e banheiro (com outro piso, não recebe este).
  */
 export function sampleProject(): Project {

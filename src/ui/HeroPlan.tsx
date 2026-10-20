@@ -13,8 +13,8 @@ const LAY_MS = 1700;
 const TAPE = 46;
 
 /**
- * Apartamento de exemplo com o piso calculado pelo próprio app. As peças aparecem a partir da
- * porta de entrada, como numa obra; uma trena mede a largura do apartamento.
+ * Lar de exemplo com o piso calculado pelo próprio app. As peças aparecem a partir da porta de
+ * entrada, como numa obra; uma trena mede a largura da planta.
  */
 export default function HeroPlan() {
   const { project, rooms, result } = useMemo(() => {
@@ -34,7 +34,7 @@ export default function HeroPlan() {
 
   return (
     <figure className="hero-plan">
-      <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="img" aria-label="Apartamento de exemplo com o piso assentado a partir da porta">
+      <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="img" aria-label="Lar de exemplo com o piso assentado a partir da porta">
         <Tape x={b.x} y={b.y - TAPE - 14} w={b.w} />
         {project.rooms
           .filter((r) => !r.receivesTile)

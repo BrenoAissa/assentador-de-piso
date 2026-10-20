@@ -4,7 +4,7 @@ import { canAdvance, roomsInCm } from './store/issues';
 import { solveLayout } from './tiling/engine';
 import { emptyProject } from './types';
 
-describe('apartamento de exemplo', () => {
+describe('lar de exemplo', () => {
   it('passa direto por todas as etapas', () => {
     const p = sampleProject();
     expect([1, 2, 3].map((s) => canAdvance(p, s as 1 | 2 | 3).ok)).toEqual([true, true, true]);

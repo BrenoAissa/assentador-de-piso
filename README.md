@@ -1,6 +1,6 @@
 # Assentador de piso
 
-App web para ver, antes da obra, como o piso vai ficar no apartamento: peças inteiras,
+App web para ver, antes da obra, como o piso vai ficar no seu lar: peças inteiras,
 recortes com medida, filetes, sobras reaproveitadas e quantas caixas comprar. A planta entra
 por PDF ou imagem (com leitura automática dos cômodos) ou é desenhada no próprio app,
 digitando as medidas das paredes. Tudo roda no navegador; a planta não sai do computador.
@@ -14,8 +14,8 @@ npm run dev
 
 Abra o endereço que aparecer (normalmente http://localhost:5173).
 
-Para testar sem planta própria, toque em "Ver um apartamento de exemplo" na tela inicial,
-escolha "Desenhar minha planta", ou envie `public/exemplo-planta.png` (apartamento de 10 × 8 m,
+Para testar sem planta própria, toque em "Ver um lar de exemplo" na tela inicial,
+escolha "Desenhar minha planta", ou envie `public/exemplo-planta.png` (planta de 10 × 8 m,
 escala de 2 px/cm, sem cotas escritas: calibre com a parede externa de 10 m).
 
 ## Como usar

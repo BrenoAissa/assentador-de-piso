@@ -1,6 +1,6 @@
 /**
  * Gera a imagem de prévia do link (public/og.png, 1200 × 630, a que aparece no WhatsApp) e os
- * ícones (public/favicon.svg, public/apple-touch-icon.png) a partir do apartamento de exemplo.
+ * ícones (public/favicon.svg, public/apple-touch-icon.png) a partir do lar de exemplo.
  *
  *   npx vite-node scripts/make-og.ts
  */
@@ -71,8 +71,8 @@ function og() {
   g.fillStyle = C.grafite;
   g.font = `700 28px ${FONT}`;
   g.fillText('Assentador de piso', 108, 87);
-  g.font = `800 62px ${FONT}`;
-  ['Veja como o piso', 'fica no seu', 'apartamento antes', 'de comprar'].forEach((l, i) => g.fillText(l, 64, 210 + i * 68));
+  g.font = `800 70px ${FONT}`;
+  ['Veja como o piso', 'fica no seu lar', 'antes de comprar'].forEach((l, i) => g.fillText(l, 64, 228 + i * 78));
   g.fillStyle = '#3a3f44';
   g.font = `400 26px ${FONT}`;
   g.fillText('Recortes, filetes e caixas de piso,', 64, 500);

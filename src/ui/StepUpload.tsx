@@ -79,10 +79,10 @@ export default function StepUpload({ onPlanReady }: Props) {
       }}
     >
       <section className="welcome-copy">
-        <h1 className="welcome-title">Veja como o piso fica no seu apartamento antes de comprar</h1>
+        <h1 className="welcome-title">Veja como o piso fica no seu lar antes de comprar</h1>
         <p className="welcome-lede">
-          Desenhe a planta com as medidas da trena ou envie o PDF do apartamento. O app mostra cada recorte, onde caem
-          os filetes e quantas caixas comprar, e deixa você montar do seu jeito.
+          Desenhe a planta do seu lar com as medidas da trena ou envie o PDF. O app mostra cada recorte, onde caem os
+          filetes e quantas caixas comprar, e deixa você montar do seu jeito.
         </p>
 
         {pdf ? (
@@ -106,7 +106,7 @@ export default function StepUpload({ onPlanReady }: Props) {
               </button>
             )}
             <button className={`btn btn-lg${hasPlan ? '' : ' btn-primary'}`} disabled={!!busy} onClick={() => void openSample()}>
-              Ver um apartamento de exemplo
+              Ver um lar de exemplo
             </button>
             <div className="welcome-pair">
               <button className="btn btn-lg" disabled={!!busy} onClick={startDrawing}>

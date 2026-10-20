@@ -96,7 +96,7 @@ export default function StepTile() {
             <legend>Grade</legend>
             <div className="segmented">
               <button aria-pressed={layout.gridMode === 'global'} onClick={() => setLayout({ gridMode: 'global' })}>
-                Contínua no apartamento
+                Contínua em todo o lar
               </button>
               <button aria-pressed={layout.gridMode === 'perRoom'} onClick={() => setLayout({ gridMode: 'perRoom' })}>
                 Uma por cômodo

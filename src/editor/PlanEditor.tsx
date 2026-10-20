@@ -8,7 +8,8 @@ import { usePanZoom, type View } from '../ui/usePanZoom';
 import { placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGeometry, snapToGrid, translateRing, type GeoSnap } from './drawing';
 import { useEditor, type Tool } from './editorStore';
 import { calibrationScale, insertVertex, nearestEdge, removeVertex, roomSizeLabel } from './ops';
-import Hint from '../ui/Hint';
+import { FitButton, MagnetButton } from '../ui/CanvasButtons';
+import Hint, { isTouch } from '../ui/Hint';
 
 type Drag =
   | { kind: 'pan'; start: Point; view: View }
@@ -22,20 +23,40 @@ const WALL_GAP_CM = 15;
 /** Grade de encaixe no projeto desenhado. */
 const GRID_CM = 5;
 
-const TOOL_LIST: { id: Tool; label: string; key: string }[] = [
-  { id: 'select', label: 'Selecionar', key: 'V' },
-  { id: 'draw', label: 'Desenhar paredes', key: 'N' },
-  { id: 'rect', label: 'Cômodo retangular', key: 'R' },
-  { id: 'calibrate', label: 'Calibrar', key: 'C' },
+/** `short`: nome no celular, onde a barra precisa caber na largura da tela. */
+const TOOL_LIST: { id: Tool; label: string; short: string; key: string }[] = [
+  { id: 'select', label: 'Selecionar', short: 'Selecionar', key: 'V' },
+  { id: 'draw', label: 'Desenhar paredes', short: 'Paredes', key: 'N' },
+  { id: 'rect', label: 'Cômodo retangular', short: 'Retângulo', key: 'R' },
+  { id: 'calibrate', label: 'Calibrar', short: 'Calibrar', key: 'C' },
 ];
 
 const HINTS: Record<Tool, string> = {
   select:
     'Clique num cômodo para selecionar e arraste para mudar de lugar (ele encaixa nas paredes vizinhas). Arraste os pontos para ajustar (Shift: livre, sem ímã), duplo clique na borda cria um ponto e Delete apaga o ponto selecionado.',
-  draw: 'Clique onde a parede começa. Aponte a direção, digite o comprimento em cm (ex.: 320) e aperte Enter, ou clique. Ângulo reto e encaixes são automáticos; segure Shift para desenhar livre. Feche no primeiro ponto ou com Enter; Backspace desfaz o último ponto.',
+  draw: 'Clique onde a parede começa. Digite o comprimento em cm e use as setas (na tela ou no teclado), ou aponte com o mouse e aperte Enter. Ângulo reto e encaixes são automáticos; segure Shift para desenhar livre. Feche no primeiro ponto ou em Fechar cômodo.',
   rect: 'Informe a largura e o comprimento: o cômodo aparece ao lado dos outros. Depois arraste para encaixar.',
   calibrate: 'Clique nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
 };
+
+/** No celular as dicas falam em toque, e mover um cômodo pede selecioná-lo antes. */
+const TOUCH_HINTS: Partial<Record<Tool, string>> = {
+  select:
+    'Toque num cômodo para selecionar. Com ele selecionado, arraste para mudar de lugar ou arraste os pontos para ajustar. Arraste o fundo para mover a vista e use dois dedos para aproximar.',
+  draw: 'Toque onde a parede começa (ou em Começar). Digite a medida e toque na seta da direção. Feche no primeiro ponto ou em Fechar cômodo.',
+  calibrate: 'Toque nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
+};
+
+/** Setas do desenho por medida, no referencial da planta (y cresce para baixo). */
+const DIRS: { key: string; label: string; name: string; d: Point }[] = [
+  { key: 'ArrowLeft', label: '←', name: 'para a esquerda', d: { x: -1, y: 0 } },
+  { key: 'ArrowUp', label: '↑', name: 'para cima', d: { x: 0, y: -1 } },
+  { key: 'ArrowDown', label: '↓', name: 'para baixo', d: { x: 0, y: 1 } },
+  { key: 'ArrowRight', label: '→', name: 'para a direita', d: { x: 1, y: 0 } },
+];
+
+/** Botões do painel de desenho não tiram o foco do campo de medida (o teclado do celular fica aberto). */
+const keepFocus = (e: { preventDefault(): void }) => e.preventDefault();
 
 const isTyping = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement | null;
@@ -78,6 +99,8 @@ export default function PlanEditor() {
   const [selVertex, setSelVertex] = useState<{ roomId: string; index: number } | null>(null);
   const [drawPts, setDrawPts] = useState<Point[]>([]);
   const [typed, setTyped] = useState('');
+  /** Nome do cômodo que está sendo desenhado parede por parede (opcional). */
+  const [drawName, setDrawName] = useState('');
   const [calib, setCalib] = useState<Point[]>([]);
   const [calibCm, setCalibCm] = useState('');
   const [hover, setHover] = useState<Point | null>(null);
@@ -86,6 +109,7 @@ export default function PlanEditor() {
   const [rect, setRect] = useState({ name: '', w: '', h: '' });
 
   const k = view.k;
+  const touch = useMemo(isTouch, []);
   const ringOf = (id: string) => (draft?.roomId === id ? draft.ring : project.rooms.find((r) => r.id === id)?.polygonPx);
   const lenLabel = (px: number) => (pxPerCm ? `${fmt(px / pxPerCm / 100, 2)} m` : '');
 
@@ -93,6 +117,7 @@ export default function PlanEditor() {
   useEffect(() => {
     setDrawPts([]);
     setTyped('');
+    setDrawName('');
     setCalib([]);
     setCalibCm('');
     setSelVertex(null);
@@ -135,20 +160,65 @@ export default function PlanEditor() {
 
   const finishDrawing = (pts: Point[]) => {
     if (pts.length < 3) return;
-    addRoom({ id: crypto.randomUUID(), name: '', polygonPx: pts, receivesTile: true, issues: [] });
+    addRoom({ id: crypto.randomUUID(), name: drawName.trim(), polygonPx: pts, receivesTile: true, issues: [] });
     setDrawPts([]);
     setTyped('');
+    setDrawName('');
     setTool('select');
+    requestFit();
   };
 
-  /** Parede com o comprimento digitado, na direção para onde o mouse aponta. */
+  // a vista acompanha o desenho: o último ponto fica à vista, fora do painel de medida
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (tool !== 'draw' || drawPts.length === 0 || !el) return;
+    const r = el.getBoundingClientRect();
+    const panel = el.querySelector<HTMLElement>('.draw-panel');
+    const top = panel && panel.offsetWidth > r.width * 0.6 ? panel.offsetTop + panel.offsetHeight : 0;
+    const p = toScreen(drawPts[drawPts.length - 1]);
+    const m = 48;
+    if (p.x < m || p.x > r.width - m || p.y < top + m || p.y > r.height - m) {
+      setView((v) => ({ ...v, tx: v.tx + r.width / 2 - p.x, ty: v.ty + (top + r.height) / 2 - p.y }));
+    }
+  }, [tool, drawPts]);
+
+  /** Parede com o comprimento digitado, na direção para onde o mouse aponta (sem mouse, use as setas). */
   const placeTyped = () => {
+    const cm = parseCm(typed);
+    if (!(cm > 0) || !pxPerCm || drawPts.length === 0 || !hover) return;
+    const last = drawPts[drawPts.length - 1];
+    setDrawPts([...drawPts, pointAtDistance(last, hover, cm * pxPerCm)]);
+    setTyped('');
+  };
+
+  /** Parede com o comprimento digitado na direção da seta; voltando ao primeiro ponto, fecha o cômodo. */
+  const addWall = (d: Point) => {
     const cm = parseCm(typed);
     if (!(cm > 0) || !pxPerCm || drawPts.length === 0) return;
     const last = drawPts[drawPts.length - 1];
-    const toward = hover ?? { x: last.x + 1, y: last.y };
-    setDrawPts([...drawPts, pointAtDistance(last, toward, cm * pxPerCm)]);
+    const next = { x: last.x + d.x * cm * pxPerCm, y: last.y + d.y * cm * pxPerCm };
+    const first = drawPts[0];
+    if (drawPts.length >= 3 && Math.hypot(next.x - first.x, next.y - first.y) < 0.5 * pxPerCm) return finishDrawing(drawPts);
+    setDrawPts([...drawPts, next]);
     setTyped('');
+  };
+
+  /** Primeiro ponto sem tocar na planta: ao lado dos cômodos que já existem, ou no canto da folha. */
+  const startBeside = () => {
+    const rings = otherRings();
+    setDrawPts([rings.length ? placeBeside(rings, WALL_GAP_CM * (pxPerCm ?? 1)) : { x: 100, y: 100 }]);
+  };
+
+  const undoPoint = () => {
+    setDrawPts(drawPts.slice(0, -1));
+    setTyped('');
+  };
+
+  const deleteVertex = () => {
+    if (!selVertex) return;
+    const ring = ringOf(selVertex.roomId);
+    if (ring && ring.length > 3) updateRoom(selVertex.roomId, { polygonPx: removeVertex(ring, selVertex.index) });
+    setSelVertex(null);
   };
 
   useEffect(() => {
@@ -167,9 +237,7 @@ export default function PlanEditor() {
         if (typed) setTyped(typed.slice(0, -1));
         else setDrawPts(drawPts.slice(0, -1));
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selVertex) {
-        const ring = ringOf(selVertex.roomId);
-        if (ring) updateRoom(selVertex.roomId, { polygonPx: removeVertex(ring, selVertex.index) });
-        setSelVertex(null);
+        deleteVertex();
       } else if (!e.ctrlKey && !e.metaKey) {
         const t = tools.find((x) => x.key.toLowerCase() === e.key.toLowerCase());
         if (t) setTool(t.id);
@@ -224,6 +292,12 @@ export default function PlanEditor() {
     const roomEl = target.closest('[data-room-shape]');
     if (roomEl) {
       const roomId = roomEl.getAttribute('data-room-shape')!;
+      // no toque, o primeiro toque só seleciona: arrastar antes disso move a vista, não o cômodo
+      if (e.pointerType === 'touch' && roomId !== selectedRoomId) {
+        selectRoom(roomId);
+        setSelVertex(null);
+        return startPan();
+      }
       selectRoom(roomId);
       setSelVertex(null);
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -349,20 +423,12 @@ export default function PlanEditor() {
       <div className="toolbar" role="toolbar" aria-label="Ferramentas">
         {tools.map((t) => (
           <button key={t.id} className="tool" aria-pressed={tool === t.id} onClick={() => setTool(t.id)} title={`${t.label} (${t.key})`}>
-            {t.label}
+            <span className="long">{t.label}</span>
+            <span className="short">{t.short}</span>
           </button>
         ))}
-        <button className="tool" onClick={fit} title="Enquadrar a planta">
-          Enquadrar
-        </button>
-        <button
-          className="tool"
-          aria-pressed={magnet}
-          onClick={() => setMagnet(!magnet)}
-          title="Ímã: encaixa em cantos, paredes, guias e ângulo reto. Segure Shift para mexer livre na hora."
-        >
-          Ímã
-        </button>
+        <FitButton onClick={fit} />
+        <MagnetButton on={magnet} onClick={() => setMagnet(!magnet)} />
       </div>
 
       <svg
@@ -400,7 +466,8 @@ export default function PlanEditor() {
             const ring = ringOf(room.id)!;
             const selected = room.id === selectedRoomId;
             const b = bbox(ring);
-            const warn = room.issues.length > 0;
+            // sem nome é pendência da lista, não erro de contorno: a borda vermelha fica para os erros
+            const warn = room.issues.some((i) => i !== 'unnamed');
             return (
               <g key={room.id}>
                 <polygon
@@ -455,19 +522,22 @@ export default function PlanEditor() {
             ringOf(selectedRoomId)?.map((q, i) => {
               const active = selVertex?.roomId === selectedRoomId && selVertex.index === i;
               return (
-                <circle
-                  key={i}
-                  data-vertex={i}
-                  data-room={selectedRoomId}
-                  cx={q.x}
-                  cy={q.y}
-                  r={(active ? 7 : 5.5) / k}
-                  fill={active ? '#f2c230' : '#fff'}
-                  stroke="#22262a"
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                  style={{ cursor: 'crosshair' }}
-                />
+                <g key={i}>
+                  {/* área de toque maior que o ponto desenhado */}
+                  <circle data-vertex={i} data-room={selectedRoomId} cx={q.x} cy={q.y} r={(touch ? 22 : 10) / k} fill="transparent" style={{ cursor: 'crosshair' }} />
+                  <circle
+                    data-vertex={i}
+                    data-room={selectedRoomId}
+                    cx={q.x}
+                    cy={q.y}
+                    r={(active ? 8 : touch ? 7 : 5.5) / k}
+                    fill={active ? '#f2c230' : '#fff'}
+                    stroke="#22262a"
+                    strokeWidth={1.5}
+                    vectorEffect="non-scaling-stroke"
+                    style={{ cursor: 'crosshair' }}
+                  />
+                </g>
               );
             })}
 
@@ -550,40 +620,110 @@ export default function PlanEditor() {
         </g>
       </svg>
 
-      {tool === 'draw' && drawPts.length > 0 && pxPerCm && (
+      {tool === 'draw' && pxPerCm && (
         <form
-          className="popover length-field"
-          style={{ left: 12, top: 60 }}
+          className="popover draw-panel"
           onSubmit={(e) => {
             e.preventDefault();
             if (typed) placeTyped();
             else finishDrawing(drawPts);
           }}
         >
-          <label className="field">
-            <span>Próxima parede (cm)</span>
-            <input
-              ref={lengthRef}
-              className="input"
-              inputMode="decimal"
-              value={typed}
-              placeholder="ex.: 320"
-              onChange={(e) => setTyped(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7))}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setDrawPts([]);
-                  setTyped('');
-                } else if (e.key === 'Backspace' && !typed) {
-                  e.preventDefault();
-                  setDrawPts(drawPts.slice(0, -1));
-                }
-              }}
-            />
-          </label>
-          <p className="muted">
-            Aponte a direção com o mouse e aperte Enter. {drawPts.length >= 3 ? 'Enter com o campo vazio fecha o cômodo.' : ''}
-          </p>
+          {drawPts.length === 0 ? (
+            <>
+              <label className="field">
+                <span>Nome do cômodo (opcional)</span>
+                <input className="input" value={drawName} onChange={(e) => setDrawName(e.target.value)} placeholder="ex.: Sala" />
+              </label>
+              <p>
+                <strong>Onde a parede começa?</strong> Toque na planta ou comece {hasRooms ? 'ao lado dos cômodos' : 'pelo canto da folha'}.
+              </p>
+              <button type="button" className="btn btn-sm" onClick={startBeside}>
+                {hasRooms ? 'Começar ao lado dos cômodos' : 'Começar pelo canto'}
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="field">
+                <span>Medida da próxima parede</span>
+                <span className="input-wrap">
+                  <input
+                    ref={lengthRef}
+                    className="input"
+                    inputMode="decimal"
+                    enterKeyHint="done"
+                    value={typed}
+                    placeholder="ex.: 320"
+                    onChange={(e) => setTyped(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7))}
+                    onKeyDown={(e) => {
+                      const dir = DIRS.find((d) => d.key === e.key);
+                      if (dir && typed) {
+                        e.preventDefault();
+                        addWall(dir.d);
+                      } else if (e.key === 'Escape') {
+                        setDrawPts([]);
+                        setTyped('');
+                      } else if (e.key === 'Backspace' && !typed) {
+                        e.preventDefault();
+                        undoPoint();
+                      }
+                    }}
+                  />
+                  <span className="suffix">cm</span>
+                </span>
+              </label>
+              <div className="dir-pad" role="group" aria-label="Direção da parede">
+                {DIRS.map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    className="btn dir"
+                    disabled={!(parseCm(typed) > 0)}
+                    aria-label={`Parede ${d.name}`}
+                    onPointerDown={keepFocus}
+                    onClick={() => addWall(d.d)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              <p className="muted">{typed ? 'Toque na seta da direção da parede.' : 'Digite a medida e toque na seta da direção.'}</p>
+              <div className="draw-actions">
+                <button type="button" className="btn btn-sm" onPointerDown={keepFocus} onClick={undoPoint}>
+                  Desfazer
+                </button>
+                {drawPts.length >= 3 && (
+                  <button type="button" className="btn btn-sm btn-primary" onPointerDown={keepFocus} onClick={() => finishDrawing(drawPts)}>
+                    Fechar cômodo
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </form>
+      )}
+
+      {tool === 'select' && selVertex && selVertex.roomId === selectedRoomId && (ringOf(selVertex.roomId)?.length ?? 0) > 3 && (() => {
+        const at = toScreen(ringOf(selVertex.roomId)![selVertex.index]);
+        return (
+          <button className="btn btn-sm vertex-delete" style={{ left: at.x + 14, top: at.y + 14 }} onClick={deleteVertex}>
+            Apagar ponto
+          </button>
+        );
+      })()}
+
+      {drawn && !hasRooms && tool === 'select' && (
+        <div className="empty-start">
+          <h3>Comece pelo primeiro cômodo</h3>
+          <button className="btn btn-primary btn-lg" onClick={() => setTool('rect')}>
+            Cômodo retangular
+            <small>largura × comprimento</small>
+          </button>
+          <button className="btn btn-lg" onClick={() => setTool('draw')}>
+            Desenhar paredes
+            <small>parede por parede, com a trena</small>
+          </button>
+        </div>
       )}
 
       {badgeAt && (pxPerCm || typed) && (
@@ -612,11 +752,11 @@ export default function PlanEditor() {
               <div className="row-2">
                 <label className="field">
                   <span>Largura (cm)</span>
-                  <input className="input" inputMode="decimal" value={rect.w} onChange={(e) => setRect({ ...rect, w: e.target.value })} placeholder="320" />
+                  <input className="input" inputMode="decimal" value={rect.w} onChange={(e) => setRect({ ...rect, w: e.target.value })} placeholder="ex.: 320" />
                 </label>
                 <label className="field">
                   <span>Comprimento (cm)</span>
-                  <input className="input" inputMode="decimal" value={rect.h} onChange={(e) => setRect({ ...rect, h: e.target.value })} placeholder="280" />
+                  <input className="input" inputMode="decimal" value={rect.h} onChange={(e) => setRect({ ...rect, h: e.target.value })} placeholder="ex.: 280" />
                 </label>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -666,7 +806,7 @@ export default function PlanEditor() {
         </form>
       )}
 
-      <Hint>{HINTS[tool]}</Hint>
+      <Hint>{(touch && TOUCH_HINTS[tool]) || HINTS[tool]}</Hint>
     </div>
   );
 }

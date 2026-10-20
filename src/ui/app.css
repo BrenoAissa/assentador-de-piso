@@ -381,6 +381,96 @@ select {
   font-weight: 650;
 }
 
+.tool .short {
+  display: none;
+}
+
+.tool-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* faixa de ferramentas da montagem: só no celular, acima da planta */
+.montar-strip {
+  display: none;
+}
+
+/* ---------- desenho por medida ---------- */
+
+.draw-panel {
+  left: 12px;
+  top: 60px;
+  width: 280px;
+}
+
+.draw-panel strong {
+  font-weight: 650;
+}
+
+.dir-pad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn.dir {
+  padding: 8px 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 650;
+}
+
+.btn.dir:not(:disabled) {
+  border-color: var(--grafite-2);
+}
+
+.draw-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vertex-delete {
+  position: absolute;
+  z-index: 3;
+  box-shadow: 0 4px 14px rgba(34, 38, 42, 0.18);
+}
+
+.empty-start {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: min(330px, calc(100% - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  background: var(--prancheta);
+  border: 1px solid var(--rejunte);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(34, 38, 42, 0.1);
+}
+
+.empty-start .btn-lg {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  white-space: normal;
+}
+
+.empty-start small {
+  font-size: 0.82rem;
+  font-weight: 450;
+  color: var(--grafite-2);
+}
+
+.empty-start .btn-primary small {
+  color: #5c4708;
+}
+
 .hint {
   pointer-events: none;
   position: absolute;
@@ -644,11 +734,17 @@ select {
 .room-item .name {
   flex: 1;
   border: 0;
-  padding: 2px 4px;
-  border-radius: 4px;
+  border-bottom: 1px dashed var(--rejunte);
+  padding: 4px 4px 3px;
+  border-radius: 4px 4px 0 0;
   font-weight: 600;
   background: transparent;
   min-width: 0;
+}
+
+.room-item .name::placeholder {
+  color: var(--grafite-2);
+  font-weight: 450;
 }
 
 .room-item .name:focus {
@@ -1204,6 +1300,13 @@ select {
   transform: translate(14px, -28px);
 }
 
+@media (pointer: coarse) {
+  /* acima do dedo, que cobriria o rótulo */
+  .measure-badge {
+    transform: translate(-50%, -70px);
+  }
+}
+
 .measure-badge.snapped {
   background: var(--ok);
 }
@@ -1352,6 +1455,125 @@ select {
   .toolbar .tool {
     white-space: nowrap;
     flex: none;
+  }
+
+  .tool .long {
+    display: none;
+  }
+
+  .tool .short {
+    display: inline;
+  }
+
+  .tool-icon {
+    padding: 8px 9px;
+  }
+
+  /* formulários sobre a planta ocupam a largura da tela */
+  .canvas > form.popover {
+    left: 8px !important;
+    right: 8px;
+    width: auto;
+  }
+
+  .draw-panel {
+    top: 58px;
+  }
+
+  .btn.dir {
+    padding: 11px 0;
+  }
+
+  .montar-strip {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 44px;
+    gap: 2px;
+    padding: 3px;
+    background: var(--prancheta);
+    border: 1px solid var(--rejunte);
+    border-radius: 8px;
+  }
+
+  .montar-strip > button {
+    border: 0;
+    background: transparent;
+    padding: 9px 2px;
+    border-radius: 5px;
+    font-size: 0.86rem;
+    white-space: nowrap;
+  }
+
+  .montar-strip > button[aria-pressed='true'] {
+    background: var(--fita);
+    font-weight: 650;
+  }
+
+  .montar-strip > .undo {
+    display: grid;
+    place-items: center;
+    border-left: 1px solid var(--rejunte-claro);
+    border-radius: 0 5px 5px 0;
+  }
+
+  .montar-strip > .undo:disabled {
+    opacity: 0.35;
+  }
+
+  /* peça tocada: o que ela é e o que dá para fazer, por cima da planta */
+  .piece-sheet {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 76px;
+    z-index: 15;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    background: var(--prancheta);
+    border: 1px solid var(--grafite-2);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(34, 38, 42, 0.2);
+    font-size: 0.9rem;
+  }
+
+  .sel-piece-section {
+    display: none;
+  }
+
+  /* comparação no celular: só o que decide (filetes, caixas) e o botão de usar */
+  .compare-table th:nth-child(2),
+  .compare-table td:nth-child(2),
+  .compare-table th:nth-child(3),
+  .compare-table td:nth-child(3),
+  .compare-table th:nth-child(6),
+  .compare-table td:nth-child(6) {
+    display: none;
+  }
+
+  .scroll-pane {
+    padding: 16px;
+  }
+
+  /* com a faixa em cima, Enquadrar e Ímã descem para baixo dela */
+  .canvas-plain .toolbar {
+    top: 58px;
+  }
+
+  .panel .tool-grid {
+    display: none;
+  }
+
+  .app[data-step='3'] .workspace {
+    grid-template-rows: minmax(170px, 30vh) auto;
+  }
+
+  .tile-preview {
+    padding: 14px 16px;
   }
 
   .welcome-copy {

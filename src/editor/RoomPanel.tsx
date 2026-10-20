@@ -93,7 +93,7 @@ export default function RoomPanel({ detectSlot }: Props) {
                 <input
                   className="name"
                   value={room.name}
-                  placeholder={`Cômodo ${i + 1}`}
+                  placeholder={`Dar nome ao cômodo ${i + 1}`}
                   aria-label="Nome do cômodo"
                   onChange={(e) => updateRoom(room.id, { name: e.target.value })}
                 />
@@ -144,7 +144,12 @@ export default function RoomPanel({ detectSlot }: Props) {
       </section>
 
       <footer className="panel-footer">
-        {!next.ok && <p className="error">{next.reason}</p>}
+        {!next.ok &&
+          (project.rooms.length === 0 ? (
+            <p className="muted">Adicione o primeiro cômodo para continuar.</p>
+          ) : (
+            <p className="error">{next.reason}</p>
+          ))}
         <div className="row">
           <button className="btn" onClick={() => setStep(1)}>
             {drawn ? 'Usar uma planta' : 'Trocar planta'}

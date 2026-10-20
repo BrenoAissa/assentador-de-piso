@@ -30,11 +30,12 @@ const TABS: { id: ResultTab; label: string }[] = [
   { id: 'compare', label: 'Comparar encaixes' },
 ];
 
-const TOOLS: { id: MontarTool; label: string }[] = [
-  { id: 'start', label: 'Marcar a entrada' },
-  { id: 'floor', label: 'Arrastar o piso' },
-  { id: 'row', label: 'Arrastar fileira' },
-  { id: 'piece', label: 'Mexer na peça' },
+/** `short`: nome na faixa de ferramentas do celular, acima da planta. */
+const TOOLS: { id: MontarTool; label: string; short: string }[] = [
+  { id: 'start', label: 'Marcar a entrada', short: 'Entrada' },
+  { id: 'floor', label: 'Arrastar o piso', short: 'Piso todo' },
+  { id: 'row', label: 'Arrastar fileira', short: 'Fileira' },
+  { id: 'piece', label: 'Mexer na peça', short: 'Peça' },
 ];
 
 const MANY_PIECES = 20000;
@@ -251,6 +252,15 @@ export default function StepResult() {
     const key = rowKey(p.roomId, p.row);
     setEdits({ ...edits, rowShift: omit(edits.rowShift, key), rowOrder: omit(edits.rowOrder, key) });
   };
+  const selDescription = selPiece
+    ? `${roomName(selPiece.roomId)}: ${
+        selPiece.removed
+          ? 'apagada (sem piso aqui)'
+          : selPiece.kind === 'full'
+            ? 'peça inteira'
+            : `${selPiece.kind === 'sliver' ? 'filete' : 'recorte'} ${selPiece.cutType ? CUT_TYPE_LABEL[selPiece.cutType].toLowerCase() : ''}, fica com ${cutLabel(selPiece)}`
+      }`
+    : '';
   const rowEdited = selPiece ? rowKey(selPiece.roomId, selPiece.row) in edits.rowShift || rowKey(selPiece.roomId, selPiece.row) in edits.rowOrder : false;
 
   return (
@@ -291,6 +301,40 @@ export default function StepResult() {
               }}
               guides={guides}
               dragLabel={dragRow ? rowLabel : floorLabel}
+              overlay={
+                <div className="montar-strip" role="toolbar" aria-label="Ferramentas de montagem">
+                  {TOOLS.map((t) => (
+                    <button key={t.id} aria-pressed={tool === t.id} onClick={() => setTool(t.id)}>
+                      {t.short}
+                    </button>
+                  ))}
+                  <button className="undo" disabled={!canUndo} onClick={undo} aria-label="Desfazer" title="Desfazer">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                      <path d="M7 5 3 9l4 4M3.5 9H12a5 5 0 0 1 0 10H9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {selPiece && (
+                    <div className="piece-sheet" role="group" aria-label={`Peça ${selPiece.n}`}>
+                      <p>
+                        <strong>Peça {selPiece.n}.</strong> {selDescription}.
+                      </p>
+                      <div className="action-row">
+                        <button className="btn btn-sm" onClick={() => setEdits({ ...edits, removed: toggleKey(edits.removed, selPiece.key) })}>
+                          {selPiece.removed ? 'Repor peça' : 'Apagar'}
+                        </button>
+                        {!selPiece.removed && (
+                          <button className="btn btn-sm" aria-pressed={!!selPiece.hidden} onClick={() => setEdits({ ...edits, hidden: toggleKey(edits.hidden, selPiece.key) })}>
+                            Embaixo de móvel
+                          </button>
+                        )}
+                        <button className="btn btn-sm btn-quiet" onClick={() => setSelected(null)}>
+                          Fechar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
             />
           ) : tab === '3d' ? (
             <Suspense fallback={<div className="center-msg">Carregando o 3D…</div>}>
@@ -388,22 +432,14 @@ export default function StepResult() {
         </section>
 
         {selPiece && (
-          <section className="panel-section">
+          <section className="panel-section sel-piece-section">
             <div className="scale-line">
               <h3>Peça {selPiece.n}</h3>
               <button className="btn btn-quiet btn-sm" onClick={() => setSelected(null)}>
                 Fechar
               </button>
             </div>
-            <p>
-              {roomName(selPiece.roomId)}:{' '}
-              {selPiece.removed
-                ? 'apagada (sem piso aqui)'
-                : selPiece.kind === 'full'
-                  ? 'peça inteira'
-                  : `${selPiece.kind === 'sliver' ? 'filete' : 'recorte'} ${selPiece.cutType ? CUT_TYPE_LABEL[selPiece.cutType].toLowerCase() : ''}, fica com ${cutLabel(selPiece)}`}
-              .
-            </p>
+            <p>{selDescription}.</p>
             {selPiece.kind !== 'full' && !selPiece.removed && (
               <p className="muted">
                 {selPiece.fromLeftoverOf !== undefined

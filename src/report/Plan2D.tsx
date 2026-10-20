@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { useEditor } from '../editor/editorStore';
 import { bbox, swapXY } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
@@ -9,6 +9,7 @@ import { entrancePiece, entrancePoints } from '../tiling/start';
 import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
 import PlanSvg from './PlanSvg';
+import { FitButton, MagnetButton } from '../ui/CanvasButtons';
 import Hint from '../ui/Hint';
 
 const MARGIN = 40;
@@ -51,6 +52,8 @@ interface Props {
   onPieceDrop(piece: Piece, axisPos: number): void;
   /** O arraste foi interrompido (virou zoom com dois dedos): desfaz a prévia sem salvar. */
   onDragCancel?(): void;
+  /** Elementos sobre a planta (no celular, a faixa de ferramentas). */
+  overlay?: ReactNode;
 }
 
 type Drag =
@@ -194,17 +197,12 @@ export default function Plan2D(props: Props) {
   return (
     <div className="canvas canvas-plain" ref={ref}>
       <div className="toolbar">
-        <button className="tool" onClick={fit}>
-          Enquadrar
-        </button>
-        <button
-          className="tool"
-          aria-pressed={magnet}
+        <FitButton onClick={fit} />
+        <MagnetButton
+          on={magnet}
           onClick={() => setMagnet(!magnet)}
           title="Ímã: o piso e as fileiras grudam quando a peça encosta na parede. Segure Shift para mexer livre na hora."
-        >
-          Ímã
-        </button>
+        />
       </div>
       <svg
         onPointerDown={onPointerDown}
@@ -287,6 +285,7 @@ export default function Plan2D(props: Props) {
           {props.dragLabel}
         </div>
       )}
+      {props.overlay}
       <Hint>{TOOL_HINT[tool]}</Hint>
     </div>
   );

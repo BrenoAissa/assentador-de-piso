@@ -6,6 +6,7 @@ import { bbox } from '../geometry/polygon';
 import { PIECE_FILL, pieceFill } from '../report/PlanSvg';
 import type { LayoutResult, Piece, RoomCm } from '../tiling/types';
 import { ringsToShapes, TILE_H, WALL_H, WALL_T, wallSegments } from './geometry';
+import Hint, { isTouch } from '../ui/Hint';
 
 const INSTANCE_ABOVE = 3000;
 const SELECTED = '#f2c230';
@@ -135,7 +136,11 @@ export default function Scene({ result, rooms, selected, onSelect }: Props) {
         ))}
         <OrbitControls target={[cx, 0, cz]} maxPolarAngle={Math.PI / 2.1} minDistance={50} maxDistance={size * 6} makeDefault />
       </Canvas>
-      <p className="hint">Arraste para girar, use a roda para aproximar e o botão direito para mover. Clique numa peça para ver o recorte.</p>
+      <Hint>
+        {isTouch()
+          ? 'Arraste para girar e use dois dedos para aproximar ou mover. Toque numa peça para ver o recorte.'
+          : 'Arraste para girar, use a roda para aproximar e o botão direito para mover. Clique numa peça para ver o recorte.'}
+      </Hint>
     </div>
   );
 }

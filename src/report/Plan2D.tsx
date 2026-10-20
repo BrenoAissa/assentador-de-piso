@@ -8,6 +8,7 @@ import type { WallGuide } from '../tiling/snap';
 import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
 import PlanSvg from './PlanSvg';
+import Hint from '../ui/Hint';
 
 const MARGIN = 40;
 const CLICK_PX = 4;
@@ -47,6 +48,8 @@ interface Props {
   dragLabel?: string | null;
   /** Posição do ponteiro ao longo da fileira (cm) quando a peça é solta. */
   onPieceDrop(piece: Piece, axisPos: number): void;
+  /** O arraste foi interrompido (virou zoom com dois dedos): desfaz a prévia sem salvar. */
+  onDragCancel?(): void;
 }
 
 type Drag =
@@ -157,6 +160,13 @@ export default function Plan2D(props: Props) {
     if (d.kind === 'piece' && d.piece) props.onPieceDrop(d.piece, along(toCm(e)));
   };
 
+  const onPointerCancel = () => {
+    const d = drag;
+    setDrag(null);
+    setPointer(null);
+    if (d && d.kind !== 'pan' && d.moved) props.onDragCancel?.();
+  };
+
   const ghost = drag && drag.kind === 'piece' && drag.moved && drag.piece ? drag : null;
   const ghostAlong = ghost ? (ghost.free ? along(ghost.delta) : (slotShift(ghost.piece!, along(ghost.startCm) + along(ghost.delta)) ?? along(ghost.delta))) : 0;
   const ghostShift = ghost ? (vertical ? { x: 0, y: ghostAlong } : { x: ghostAlong, y: 0 }) : null;
@@ -192,6 +202,7 @@ export default function Plan2D(props: Props) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
         style={{ cursor }}
         aria-label="Montagem do piso"
@@ -272,7 +283,7 @@ export default function Plan2D(props: Props) {
           {props.dragLabel}
         </div>
       )}
-      <p className="hint">{TOOL_HINT[tool]}</p>
+      <Hint>{TOOL_HINT[tool]}</Hint>
     </div>
   );
 }

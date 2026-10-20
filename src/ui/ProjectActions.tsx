@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { parseProject, serializeProject } from '../persistence/serialize';
 import { useProject } from '../store/project';
 import { emptyProject } from '../types';
@@ -34,6 +34,26 @@ export default function ProjectActions() {
     void useProject.getState().replaceProject(emptyProject(), null);
   };
 
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  /** No celular as ações ficam num menu; ele fecha depois de escolher. */
+  const act = (fn: () => void) => () => {
+    if (menuRef.current) menuRef.current.open = false;
+    fn();
+  };
+  const actions = (cls: string): ReactNode => (
+    <>
+      <button className={`btn ${cls} btn-quiet`} onClick={act(newProject)}>
+        Novo projeto
+      </button>
+      <button className={`btn ${cls}`} onClick={act(() => inputRef.current?.click())}>
+        Abrir projeto
+      </button>
+      <button className={`btn ${cls}`} onClick={act(() => void exportProject())}>
+        Salvar arquivo
+      </button>
+    </>
+  );
+
   return (
     <div className="topbar-actions">
       {error && (
@@ -41,15 +61,11 @@ export default function ProjectActions() {
           {error}
         </span>
       )}
-      <button className="btn btn-sm btn-quiet" onClick={newProject}>
-        Novo projeto
-      </button>
-      <button className="btn btn-sm" onClick={() => inputRef.current?.click()}>
-        Abrir projeto
-      </button>
-      <button className="btn btn-sm" onClick={() => void exportProject()}>
-        Salvar arquivo
-      </button>
+      <div className="actions-inline">{actions('btn-sm')}</div>
+      <details className="project-menu" ref={menuRef}>
+        <summary className="btn btn-sm">Projeto</summary>
+        <div className="project-menu-pop">{actions('')}</div>
+      </details>
       <input
         ref={inputRef}
         type="file"

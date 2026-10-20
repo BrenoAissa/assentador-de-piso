@@ -20,7 +20,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" data-step={step}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
@@ -29,7 +29,7 @@ export default function App() {
             <i />
             <i />
           </span>
-          Assentador de piso
+          <span className="brand-name">Assentador de piso</span>
         </div>
         <Stepper />
         <ProjectActions />

@@ -8,6 +8,7 @@ import { usePanZoom, type View } from '../ui/usePanZoom';
 import { placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGeometry, snapToGrid, translateRing, type GeoSnap } from './drawing';
 import { useEditor, type Tool } from './editorStore';
 import { calibrationScale, insertVertex, nearestEdge, removeVertex, roomSizeLabel } from './ops';
+import Hint from '../ui/Hint';
 
 type Drag =
   | { kind: 'pan'; start: Point; view: View }
@@ -198,6 +199,7 @@ export default function PlanEditor() {
       const first = drawPts[0];
       if (first && drawPts.length >= 3 && Math.hypot(sp.x - first.x, sp.y - first.y) < 0.01) return finishDrawing(drawPts);
       setDrawPts([...drawPts, sp]);
+      touchPoint.current = e.pointerType === 'touch' ? e.pointerId : null;
       setTyped('');
       return;
     }
@@ -266,7 +268,19 @@ export default function PlanEditor() {
     } else if (tool !== 'select') setHover(p);
   };
 
+  /** Toque que pôs o último ponto do desenho: se virar pinça (zoom), o ponto sai. */
+  const touchPoint = useRef<number | null>(null);
+
+  const onPointerCancel = (e: RPointerEvent<SVGSVGElement>) => {
+    if (tool === 'draw' && touchPoint.current === e.pointerId) setDrawPts((pts) => pts.slice(0, -1));
+    touchPoint.current = null;
+    setSnapInfo({ kind: null, guides: [] });
+    setDraft(null);
+    setDrag(null);
+  };
+
   const onPointerUp = () => {
+    touchPoint.current = null;
     setSnapInfo({ kind: null, guides: [] });
     if ((drag?.kind === 'vertex' || drag?.kind === 'move') && draft && drag.moved) {
       updateRoom(draft.roomId, { polygonPx: draft.ring });
@@ -355,6 +369,7 @@ export default function PlanEditor() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerLeave={() => {
           setHover(null);
           setSnapInfo({ kind: null, guides: [] });
@@ -651,7 +666,7 @@ export default function PlanEditor() {
         </form>
       )}
 
-      <p className="hint">{HINTS[tool]}</p>
+      <Hint>{HINTS[tool]}</Hint>
     </div>
   );
 }

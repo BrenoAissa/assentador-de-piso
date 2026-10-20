@@ -171,7 +171,46 @@ select {
 .topbar-actions {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.actions-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.project-menu {
+  display: none;
+  position: relative;
+}
+
+.project-menu summary {
+  list-style: none;
+}
+
+.project-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  background: var(--prancheta);
+  border: 1px solid var(--rejunte);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(34, 38, 42, 0.14);
+}
+
+.project-menu-pop .btn {
+  justify-content: flex-start;
+  padding: 10px 12px;
 }
 
 /* ---------- botões e campos ---------- */
@@ -349,10 +388,12 @@ select {
   bottom: 12px;
   max-width: min(560px, calc(100% - 24px));
   padding: 8px 12px;
+  border: 0;
   background: var(--grafite);
   color: #fff;
   border-radius: 6px;
   font-size: 0.86rem;
+  text-align: left;
   z-index: 2;
 }
 
@@ -368,34 +409,206 @@ select {
   width: 240px;
 }
 
-/* ---------- passo 1 ---------- */
+/* ---------- passo 1: boas-vindas ---------- */
 
-.dropzone {
+.welcome {
+  overflow: auto;
   display: grid;
-  place-items: center;
-  padding: 16px;
+  grid-template-columns: minmax(300px, 30rem) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 64px);
+  padding: clamp(24px, 5vw, 72px);
+  background-color: var(--papel);
+  background-image: linear-gradient(#e3e6e2 1px, transparent 1px), linear-gradient(90deg, #e3e6e2 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-.dropzone-box {
-  width: min(560px, 100%);
-  padding: 40px 32px;
-  background: var(--prancheta);
-  border: 2px dashed var(--rejunte);
-  border-radius: 12px;
+.welcome.over {
+  outline: 3px dashed var(--fita-escura);
+  outline-offset: -12px;
+}
+
+.welcome-copy {
   display: grid;
-  gap: 14px;
+  gap: 20px;
   justify-items: start;
 }
 
-.dropzone.over .dropzone-box {
-  border-color: var(--fita-escura);
-  background: #fffbea;
+.welcome-title {
+  font-size: clamp(2.1rem, 4.2vw, 3.5rem);
+  font-weight: 820;
+  font-stretch: 118%;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.welcome-lede {
+  font-size: 1.08rem;
+  line-height: 1.55;
+  max-width: 34em;
+  color: #3a3f44;
+}
+
+.welcome-actions {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 26rem;
+}
+
+.welcome-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.welcome-pair .btn {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.btn-lg {
+  padding: 13px 18px;
+  font-size: 1rem;
+  border-radius: 8px;
+}
+
+.btn-primary.btn-lg {
+  font-size: 1.06rem;
+  box-shadow: 0 2px 0 var(--fita-escura);
+}
+
+.welcome-pdf {
+  display: grid;
+  gap: 10px;
+}
+
+.welcome-note {
+  font-size: 0.86rem;
+  color: var(--grafite-2);
+  max-width: 30em;
+  padding-left: 12px;
+  border-left: 3px solid var(--fita);
+}
+
+.hero-plan {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hero-plan svg {
+  width: 100%;
+  height: auto;
+  max-height: 72vh;
+  display: block;
+  overflow: visible;
+}
+
+.hero-plan figcaption {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.hero-other {
+  fill: #fafbfa;
+  stroke: none;
+}
+
+.hero-room {
+  font-size: 27px;
+  font-weight: 650;
+  font-stretch: 92%;
+  text-anchor: middle;
+  fill: var(--grafite);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
+
+.hero-room-note {
+  font-size: 21px;
+  font-weight: 450;
+  fill: var(--grafite-2);
+}
+
+.hero-door circle {
+  fill: var(--fita);
+  stroke: var(--grafite);
+  stroke-width: 3px;
+}
+
+.hero-door text {
+  font-size: 24px;
+  font-weight: 650;
+  text-anchor: middle;
+  fill: var(--grafite);
+}
+
+.hero-tape rect {
+  fill: var(--fita);
+  stroke: var(--fita-escura);
+  stroke-width: 1.5px;
+}
+
+.hero-tape line {
+  stroke: var(--grafite);
+  stroke-width: 2px;
+}
+
+.hero-tape text {
+  font-size: 19px;
+  font-weight: 700;
+  fill: var(--grafite);
+  text-anchor: end;
+}
+
+.hero-tape .hero-tape-total {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+/* as peças são assentadas a partir da porta, uma vez, quando a tela abre */
+.lay {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lay 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes lay {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .page-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.sample-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #fff6d6;
+  border-bottom: 1px solid #f0dc92;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.sample-notice p {
+  flex: 1;
 }
 
 /* ---------- cômodos ---------- */
@@ -643,6 +856,7 @@ select {
   background: var(--papel);
   border-bottom: 1px solid var(--rejunte);
   overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tabs button {
@@ -970,15 +1184,6 @@ select {
 
 /* ---------- desenhar do zero ---------- */
 
-.draw-instead {
-  display: grid;
-  gap: 8px;
-  justify-items: start;
-  width: 100%;
-  padding-top: 14px;
-  border-top: 1px solid var(--rejunte-claro);
-}
-
 .measure-badge {
   position: absolute;
   z-index: 3;
@@ -1026,6 +1231,26 @@ select {
 /* ---------- celular ---------- */
 
 @media (max-width: 860px) {
+  .welcome {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 20px;
+    padding: 16px 16px 32px;
+  }
+
+  .welcome-title {
+    font-size: clamp(1.75rem, 7.6vw, 2.4rem);
+    font-stretch: 108%;
+  }
+
+  .welcome-lede {
+    font-size: 1rem;
+  }
+
+  .welcome-actions {
+    max-width: none;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
     grid-template-rows: 62vh auto;
@@ -1043,7 +1268,114 @@ select {
   }
 
   .topbar {
-    gap: 12px;
+    gap: 10px;
+    padding: 8px 12px;
+    flex-wrap: nowrap;
+  }
+
+  .actions-inline {
+    display: none;
+  }
+
+  .project-menu {
+    display: block;
+  }
+
+  /* na tela inicial o nome do app aparece; nos passos, o espaço vai para os números */
+  .app[data-step='1'] .stepper-nav,
+  .app:not([data-step='1']) .brand-name {
+    display: none;
+  }
+
+  .stepper li + li::before {
+    width: 14px;
+  }
+
+  /* dica numa linha só; um toque abre o texto inteiro */
+  .hint {
+    pointer-events: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-width: none;
+    padding: 8px 12px 8px 34px;
+    font-size: 0.84rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .hint::before {
+    content: '?';
+    position: absolute;
+    left: 9px;
+    top: 7px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--fita);
+    color: var(--grafite);
+    font-weight: 750;
+    font-size: 0.78rem;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .hint.open {
+    white-space: normal;
+  }
+
+  /* campos com 16px: o iPhone não dá zoom ao tocar neles */
+  .input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .tool {
+    padding: 9px 11px;
+  }
+
+  .toolbar {
+    max-width: calc(100% - 24px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .toolbar .tool {
+    white-space: nowrap;
+    flex: none;
+  }
+
+  .welcome-copy {
+    display: contents;
+  }
+
+  .welcome-title {
+    order: 1;
+  }
+
+  .welcome .hero-plan {
+    order: 2;
+  }
+
+  .welcome-actions,
+  .welcome-pdf {
+    order: 3;
+  }
+
+  .welcome [role='status'],
+  .welcome [role='alert'] {
+    order: 4;
+  }
+
+  .welcome-lede {
+    order: 5;
+  }
+
+  .welcome-note {
+    order: 6;
   }
 }
 

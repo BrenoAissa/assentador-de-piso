@@ -20,6 +20,7 @@ import { startOrigin } from '../tiling/start';
 import type { LayoutResult, ManualEdits, Piece } from '../tiling/types';
 import { CUT_TYPE_LABEL, cutLabel, fmt } from './format';
 import { OrientationPicker, PatternPicker } from './LayoutPickers';
+import SampleNotice from './SampleNotice';
 
 export type ResultTab = 'montar' | '3d' | 'cuts' | 'compare';
 
@@ -280,6 +281,13 @@ export default function StepResult() {
               onFloorDrag={onFloorDrag}
               onRowDrag={onRowDrag}
               onPieceDrop={onPieceDrop}
+              onDragCancel={() => {
+                cancelAnimationFrame(frame.current);
+                setPreview(null);
+                setGuides([]);
+                setFloorLabel(null);
+                setDragRow(null);
+              }}
               guides={guides}
               dragLabel={dragRow ? rowLabel : floorLabel}
             />
@@ -300,6 +308,7 @@ export default function StepResult() {
       </div>
 
       <aside className="panel" aria-label="Resultado">
+        <SampleNotice />
         <section className="panel-section">
           {shown ? <Summary summary={shown.summary} tile={tile} /> : <p className="muted">Calculando…</p>}
           {shown && shown.pieces.length > MANY_PIECES && (

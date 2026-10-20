@@ -5,6 +5,7 @@ import { validateTile } from '../tiling/validate';
 import { OrientationPicker } from './LayoutPickers';
 import NumField from './NumField';
 import TilePreview from './TilePreview';
+import SampleNotice from './SampleNotice';
 
 const PRESETS: { label: string; hint: string; l: number; w: number; joint: number }[] = [
   { label: '60 × 60', hint: 'porcelanato', l: 60, w: 60, joint: 2 },
@@ -37,6 +38,7 @@ export default function StepTile() {
         <TilePreview tile={tile} layout={layout} />
       </div>
       <aside className="panel" aria-label="Piso">
+        <SampleNotice />
         <section className="panel-section">
           <h3>Qual é a peça?</h3>
           <div className="tile-cards">

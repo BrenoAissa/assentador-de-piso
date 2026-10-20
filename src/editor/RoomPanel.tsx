@@ -4,6 +4,7 @@ import { isDrawn } from '../types';
 import { useEditor } from './editorStore';
 import { roomSizeLabel } from './ops';
 import WallsEditor from './WallsEditor';
+import SampleNotice from '../ui/SampleNotice';
 
 const fmtScale = (pxPerCm: number) =>
   `1 m = ${(pxPerCm * 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} px`;
@@ -25,6 +26,7 @@ export default function RoomPanel({ detectSlot }: Props) {
 
   return (
     <aside className="panel" aria-label="Cômodos">
+      <SampleNotice />
       {drawn ? (
         <section className="panel-section">
           <div className="scale-line">

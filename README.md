@@ -14,9 +14,9 @@ npm run dev
 
 Abra o endereço que aparecer (normalmente http://localhost:5173).
 
-Para testar sem planta própria, use `public/exemplo-planta.png` (apartamento de 10 × 8 m,
-escala de 2 px/cm, sem cotas escritas: calibre com a parede externa de 10 m), ou escolha
-"Desenhar a planta".
+Para testar sem planta própria, toque em "Ver um apartamento de exemplo" na tela inicial,
+escolha "Desenhar minha planta", ou envie `public/exemplo-planta.png` (apartamento de 10 × 8 m,
+escala de 2 px/cm, sem cotas escritas: calibre com a parede externa de 10 m).
 
 ## Como usar
 
@@ -39,6 +39,7 @@ escala de 2 px/cm, sem cotas escritas: calibre com a parede externa de 10 m), ou
 npm test        # testes (motor de paginação, detecção, store)
 npm run build   # checagem de tipos + build de produção
 node scripts/make-sample-plan.mjs   # regera a planta de exemplo
+npx vite-node scripts/make-og.ts    # regera a imagem de prévia do link e os ícones
 ```
 
 Especificação: `docs/superpowers/specs/2026-10-18-paginador-piso-design.md`.

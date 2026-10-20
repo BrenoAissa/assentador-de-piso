@@ -23,7 +23,7 @@ export default function Stepper() {
   const setStep = useProject((s) => s.setStep);
 
   return (
-    <nav aria-label="Passos">
+    <nav aria-label="Passos" className="stepper-nav">
       <ol className="stepper">
         {STEPS.map(({ n, label }) => {
           const blocker = n === step ? null : blockerBefore(project, n);

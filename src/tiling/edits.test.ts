@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bbox } from '../geometry/polygon';
 import type { Ring } from '../geometry/types';
-import { moveInOrder, targetIndex } from './edits';
+import { moveInOrder, slotStart, targetIndex } from './edits';
 import { computeLayout } from './engine';
 import { layout, rectRoom, tile } from './testUtils';
 import { NO_EDITS, type ManualEdits, type RoomCm } from './types';
@@ -97,5 +97,21 @@ describe('ajudantes de reordenação', () => {
     expect(targetIndex(centers, 10)).toBe(0);
     expect(targetIndex(centers, 100)).toBe(2);
     expect(targetIndex(centers, 400)).toBe(4);
+  });
+
+  it('slotStart diz onde a peça arrastada vai cair (a vaga, não o mouse)', () => {
+    // fileira: recorte de 25, três inteiras de 60, rejunte 0,2
+    const spans = [
+      { start: 0, len: 25 },
+      { start: 25.2, len: 60 },
+      { start: 85.4, len: 60 },
+      { start: 145.6, len: 60 },
+    ];
+    // o recorte (índice 0) indo para o fim: depois das três inteiras
+    expect(slotStart(spans, 0, 3, 0.2)).toBeCloseTo(180.6);
+    // uma inteira indo para o começo: no início da fileira
+    expect(slotStart(spans, 2, 0, 0.2)).toBeCloseTo(0);
+    // ficando no lugar
+    expect(slotStart(spans, 1, 1, 0.2)).toBeCloseTo(25.2);
   });
 });

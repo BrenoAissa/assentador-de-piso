@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { useEditor } from '../editor/editorStore';
-import { bbox } from '../geometry/polygon';
+import { bbox, swapXY } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
+import { rowIsStrip, slotStart, targetIndex } from '../tiling/edits';
+import { pitch } from '../tiling/grid';
 import type { WallGuide } from '../tiling/snap';
 import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
@@ -17,8 +19,8 @@ export type MontarTool = 'start' | 'floor' | 'row' | 'piece';
 export const TOOL_HINT: Record<MontarTool, string> = {
   start: 'Clique onde o piso deve começar, por exemplo na porta de entrada. A peça ali fica inteira e os recortes vão para as paredes do outro lado.',
   floor: 'Arraste o piso inteiro para mudar onde caem os recortes; ele gruda quando a peça encosta na parede (Shift: livre). Arraste o fundo para mover a vista.',
-  row: 'Arraste uma peça para deslizar a fileira dela; a ponta gruda na parede (Shift: livre). Bom para levar o filete para baixo de um móvel.',
-  piece: 'Arraste uma peça ao longo da fileira para trocar de lugar; as outras se acomodam. Clique numa peça para apagar ou marcar como embaixo de móvel.',
+  row: 'Arraste uma peça para deslizar a fileira dela; ela gruda na parede e nas juntas das fileiras vizinhas (Shift: livre). Bom para levar o filete para baixo de um móvel.',
+  piece: 'Arraste uma peça ao longo da fileira para trocar de lugar; ela pula de vaga em vaga e as outras se acomodam (Shift: livre). Clique numa peça para apagar ou marcar como embaixo de móvel.',
 };
 
 interface Props {
@@ -49,7 +51,7 @@ interface Props {
 
 type Drag =
   | { kind: 'pan'; start: Point; view: View; moved: boolean; piece?: Piece }
-  | { kind: 'floor' | 'row' | 'piece'; start: Point; startCm: Point; moved: boolean; piece?: Piece; delta: Point }
+  | { kind: 'floor' | 'row' | 'piece'; start: Point; startCm: Point; moved: boolean; piece?: Piece; delta: Point; free?: boolean }
   | null;
 
 export default function Plan2D(props: Props) {
@@ -82,6 +84,25 @@ export default function Plan2D(props: Props) {
   const pieceByKey = useMemo(() => new Map(result.pieces.map((p) => [p.key, p])), [result]);
   const sel = selected ? pieceByKey.get(selected) : undefined;
 
+  /**
+   * Ímã da peça arrastada: quanto ela anda para cair na vaga onde seria solta (o mesmo cálculo
+   * de quando solta). Null se a fileira não for uma faixa reta (aí ela segue o mouse).
+   */
+  const slotShift = (piece: Piece, mouseAlong: number): number | null => {
+    const span = (p: Piece) => {
+      const b = bbox(p.shape);
+      return vertical ? { start: b.y, len: b.h } : { start: b.x, len: b.w };
+    };
+    const row = result.pieces.filter((p) => p.roomId === piece.roomId && p.row === piece.row).sort((a, b) => span(a).start - span(b).start);
+    const frameRow = vertical ? row.map((p) => ({ ...p, shape: p.shape.map(swapXY) })) : row;
+    if (!rowIsStrip(frameRow, pitch(tile).joint)) return null;
+    const moving = row.findIndex((p) => p.key === piece.key);
+    if (moving < 0) return null;
+    const spans = row.map(span);
+    const others = spans.filter((_, i) => i !== moving).map((s) => s.start + s.len / 2);
+    return slotStart(spans, moving, targetIndex(others, mouseAlong), pitch(tile).joint) - spans[moving].start;
+  };
+
   const pieceUnder = (target: EventTarget) => {
     const el = (target as Element).closest('[data-piece]');
     return el ? pieceByKey.get(el.getAttribute('data-piece')!) : undefined;
@@ -108,7 +129,7 @@ export default function Plan2D(props: Props) {
     }
     const cm = toCm(e);
     const delta = { x: Math.round((cm.x - drag.startCm.x) * 2) / 2, y: Math.round((cm.y - drag.startCm.y) * 2) / 2 };
-    setDrag({ ...drag, moved: true, delta });
+    setDrag({ ...drag, moved: true, delta, free: snapTol(e) === 0 });
     const rect = ref.current!.getBoundingClientRect();
     setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     const tol = snapTol(e);
@@ -137,7 +158,8 @@ export default function Plan2D(props: Props) {
   };
 
   const ghost = drag && drag.kind === 'piece' && drag.moved && drag.piece ? drag : null;
-  const ghostShift = ghost ? (vertical ? { x: 0, y: ghost.delta.y } : { x: ghost.delta.x, y: 0 }) : null;
+  const ghostAlong = ghost ? (ghost.free ? along(ghost.delta) : (slotShift(ghost.piece!, along(ghost.startCm) + along(ghost.delta)) ?? along(ghost.delta))) : 0;
+  const ghostShift = ghost ? (vertical ? { x: 0, y: ghostAlong } : { x: ghostAlong, y: 0 }) : null;
   const cursor =
     drag?.kind === 'pan' && drag.moved
       ? 'grabbing'
@@ -215,8 +237,9 @@ export default function Plan2D(props: Props) {
               x2={g.b.x}
               y2={g.b.y}
               stroke="#2f7d4f"
-              strokeWidth={6}
-              strokeLinecap="round"
+              strokeWidth={g.joint ? 2 : 6}
+              strokeDasharray={g.joint ? '6 4' : undefined}
+              strokeLinecap={g.joint ? 'butt' : 'round'}
               opacity={0.85}
               vectorEffect="non-scaling-stroke"
               pointerEvents="none"

@@ -15,7 +15,7 @@ import { solveInWorker } from '../tiling/client';
 import { moveInOrder, rowIsStrip, rowKey, targetIndex } from '../tiling/edits';
 import { computeLayout } from '../tiling/engine';
 import { pitch } from '../tiling/grid';
-import { floorSnap, rowSnap, type WallGuide } from '../tiling/snap';
+import { floorSnap, rowSnap, type RowMatch, type WallGuide } from '../tiling/snap';
 import { startOrigin } from '../tiling/start';
 import type { LayoutResult, ManualEdits, Piece } from '../tiling/types';
 import { CUT_TYPE_LABEL, cutLabel, fmt } from './format';
@@ -65,7 +65,7 @@ export default function StepResult() {
   const [topView, setTopView] = useState<string | null>(null);
   const [guides, setGuides] = useState<WallGuide[]>([]);
   const [floorLabel, setFloorLabel] = useState<string | null>(null);
-  const [dragRow, setDragRow] = useState<{ roomId: string; row: number } | null>(null);
+  const [dragRow, setDragRow] = useState<{ roomId: string; row: number; matches: RowMatch[]; free: boolean } | null>(null);
   const [printing, setPrinting] = useState(false);
   const frame = useRef(0);
 
@@ -157,7 +157,11 @@ export default function StepResult() {
     const room = rooms.find((r) => r.id === piece.roomId);
     if (!room) return;
     const key = rowKey(piece.roomId, piece.row);
-    const snap = rowSnap(room, tile, layout, result.roomOrigins[room.id], piece.row, (edits.rowShift[key] ?? 0) + delta, tolCm);
+    // fileiras vizinhas do mesmo cômodo, com o deslize que já tiverem, para alinhar as juntas
+    const neighbours = [piece.row - 1, piece.row + 1]
+      .filter((r) => result.pieces.some((p) => p.roomId === room.id && p.row === r))
+      .map((r) => ({ row: r, extra: edits.rowShift[rowKey(room.id, r)] ?? 0 }));
+    const snap = rowSnap(room, tile, layout, result.roomOrigins[room.id], piece.row, (edits.rowShift[key] ?? 0) + delta, tolCm, neighbours);
     const next: ManualEdits = {
       ...edits,
       rowShift: { ...edits.rowShift, [key]: snap.extra },
@@ -170,7 +174,7 @@ export default function StepResult() {
       return;
     }
     setGuides(snap.guides);
-    setDragRow({ roomId: piece.roomId, row: piece.row });
+    setDragRow({ roomId: piece.roomId, row: piece.row, matches: snap.matches, free: tolCm === 0 });
     previewWith(result.roomOrigins, next);
   };
 
@@ -187,7 +191,15 @@ export default function StepResult() {
     const L = tile.lengthCm;
     const end = (p: Piece) => (Math.abs(along(p).len - L) < 0.1 ? 'inteira' : `${fmt(along(p).len)} cm`);
     const text = `Pontas da fileira: ${end(row[0])} e ${end(row[row.length - 1])}`;
-    return guides.length ? `${text}, encostada na parede` : text;
+    const said: Record<RowMatch, string> = {
+      wall: 'encostada na parede',
+      aligned: 'juntas alinhadas com a vizinha',
+      half: 'meio a meio com a vizinha',
+      pattern: 'no encaixe original',
+    };
+    const extras = dragRow.matches.map((m) => said[m]);
+    if (extras.length === 0 && dragRow.free) extras.push('livre, sem ímã');
+    return [text, ...extras].join(', ');
   })();
 
   const onPieceDrop = (piece: Piece, axisPos: number) => {

@@ -47,6 +47,7 @@ describe('rowSnap (ímã da fileira nas paredes)', () => {
     const s = rowSnap(room, t60, layout(), { x: 0, y: 0 }, 0, 7, 5);
     expect(s.extra).toBeCloseTo(10);
     expect(s.guides).toHaveLength(1);
+    expect(s.matches).toEqual(['wall']);
   });
 
   it('não mexe quando está longe', () => {
@@ -54,3 +55,42 @@ describe('rowSnap (ímã da fileira nas paredes)', () => {
     expect(rowSnap(room, t60, layout(), { x: 0, y: 0 }, 0, 30, 5).extra).toBe(30);
   });
 });
+
+describe('rowSnap (ímã da fileira nas fileiras vizinhas)', () => {
+  // cômodo de 7 a 1000: paredes puxam para posições ≡ 7 e ≡ 40 (mod 60), longe dos testes abaixo
+  const room = rectRoom('sala', 7, 0, 993, 300);
+
+  it('alinha as juntas com a fileira de cima', () => {
+    // tijolinho: a fileira 1 nasce deslocada 30; puxando −28 ela cai a 2 cm das juntas da fileira 0
+    const lay = layout({ pattern: 'running' });
+    const s = rowSnap(room, t60, lay, { x: 0, y: 0 }, 1, -28, 5, [{ row: 0, extra: 0 }]);
+    expect(s.extra).toBeCloseTo(-30);
+    expect(s.matches).toContain('aligned');
+    expect(s.guides.length).toBeGreaterThan(0);
+  });
+
+  it('acompanha a vizinha que já foi arrastada', () => {
+    const s = rowSnap(room, t60, layout(), { x: 0, y: 0 }, 1, 11, 5, [{ row: 0, extra: 13 }]);
+    expect(s.extra).toBeCloseTo(13);
+    expect(s.matches).toContain('aligned');
+  });
+
+  it('gruda meio a meio (tijolinho) com a vizinha', () => {
+    const s = rowSnap(room, t60, layout(), { x: 0, y: 0 }, 1, 27, 5, [{ row: 0, extra: 0 }]);
+    expect(s.extra).toBeCloseTo(30);
+    expect(s.matches).toEqual(['half']);
+  });
+
+  it('volta para o encaixe original quando chega perto dele', () => {
+    const s = rowSnap(room, t60, layout(), { x: 0, y: 0 }, 1, 2, 5, [{ row: 0, extra: 13 }]);
+    expect(s.extra).toBeCloseTo(0);
+    expect(s.matches).toEqual(['pattern']);
+  });
+
+  it('sem vizinhas por perto, só as paredes contam', () => {
+    const s = rowSnap(room, t60, layout(), { x: 0, y: 0 }, 1, 20, 5, [{ row: 0, extra: 0 }]);
+    expect(s.extra).toBe(20);
+    expect(s.matches).toEqual([]);
+  });
+});
+

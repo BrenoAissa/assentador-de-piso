@@ -19,6 +19,18 @@ export function targetIndex(centers: number[], pos: number): number {
 }
 
 /**
+ * Onde a peça `moving` (índice em `spans`, ordenados ao longo da fileira) começa se for solta
+ * na posição `index` da fileira sem ela: a vaga onde ela vai cair, para a peça arrastada
+ * pular de vaga em vaga.
+ */
+export function slotStart(spans: { start: number; len: number }[], moving: number, index: number, joint: number): number {
+  const rest = spans.filter((_, i) => i !== moving);
+  let cursor = Math.min(...spans.map((s) => s.start));
+  for (const s of rest.slice(0, Math.max(0, Math.min(rest.length, index)))) cursor += s.len + joint;
+  return cursor;
+}
+
+/**
  * A fileira (peças de um cômodo numa mesma fileira, no referencial da paginação) é uma faixa
  * reta e contínua de peças retangulares de mesma altura? Só assim dá para reordenar sem
  * buraco nem sobreposição.

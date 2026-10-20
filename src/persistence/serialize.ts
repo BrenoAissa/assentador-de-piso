@@ -1,7 +1,11 @@
 import { normalizeProject, type Project } from '../types';
 
+/** Marca dos arquivos de projeto; os salvos quando o app se chamava Paginador de piso também abrem. */
+const APP_ID = 'assentador-piso';
+const OLD_APP_IDS = ['paginador-piso'];
+
 interface ProjectFile {
-  app: 'paginador-piso';
+  app: string;
   project: Project;
   image: { type: string; base64: string } | null;
 }
@@ -25,7 +29,7 @@ function base64ToBlob(base64: string, type: string): Blob {
 
 export async function serializeProject(project: Project, image: Blob | null): Promise<string> {
   const file: ProjectFile = {
-    app: 'paginador-piso',
+    app: APP_ID,
     project,
     image: image ? { type: image.type, base64: await blobToBase64(image) } : null,
   };
@@ -40,7 +44,7 @@ export async function parseProject(json: string): Promise<{ project: Project; im
     throw new Error('Arquivo de projeto inválido.');
   }
   const p = file?.project;
-  if (file?.app !== 'paginador-piso' || p?.version !== 1 || !Array.isArray(p.rooms) || !p.tile || !p.layout) {
+  if (![APP_ID, ...OLD_APP_IDS].includes(file?.app) || p?.version !== 1 || !Array.isArray(p.rooms) || !p.tile || !p.layout) {
     throw new Error('Arquivo de projeto inválido.');
   }
   return { project: normalizeProject(p), image: file.image ? base64ToBlob(file.image.base64, file.image.type) : null };

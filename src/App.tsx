@@ -29,7 +29,7 @@ export default function App() {
             <i />
             <i />
           </span>
-          Paginador de piso
+          Assentador de piso
         </div>
         <Stepper />
         <ProjectActions />

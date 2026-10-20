@@ -1,4 +1,4 @@
-# Paginador de piso
+# Assentador de piso
 
 App web para ver, antes da obra, como o piso vai ficar no apartamento: peças inteiras,
 recortes com medida, filetes, sobras reaproveitadas e quantas caixas comprar. A planta entra

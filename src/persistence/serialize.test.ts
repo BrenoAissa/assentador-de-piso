@@ -27,6 +27,13 @@ describe('serializeProject / parseProject', () => {
     expect(back.project).toEqual(emptyProject());
   });
 
+  it('salva com o nome novo e ainda abre arquivos do tempo do Paginador de piso', async () => {
+    const json = await serializeProject(emptyProject(), null);
+    expect(JSON.parse(json).app).toBe('assentador-piso');
+    const antigo = JSON.stringify({ ...JSON.parse(json), app: 'paginador-piso' });
+    expect((await parseProject(antigo)).project).toEqual(emptyProject());
+  });
+
   it('arquivo que não é projeto gera erro claro', async () => {
     await expect(parseProject('{"foo": 1}')).rejects.toThrow('Arquivo de projeto inválido');
     await expect(parseProject('não é json')).rejects.toThrow('Arquivo de projeto inválido');

@@ -13,6 +13,13 @@ describe('floorSnap (ímã do piso nas paredes)', () => {
     expect(s.guides.some((g) => g.a.x === 310 && g.b.x === 310)).toBe(true);
   });
 
+  it('tolerância zero (mexer livre, Shift ou ímã desligado) não gruda', () => {
+    const rooms = [rectRoom('sala', 0, 0, 310, 300)];
+    const s = floorSnap(rooms, t60, layout(), { x: 0, y: 0 }, { x: 13, y: 0 }, 0);
+    expect(s.delta).toEqual({ x: 13, y: 0 });
+    expect(rowSnap(rectRoom('s', 0, 0, 310, 60), t60, layout(), { x: 0, y: 0 }, 0, 7, 0).extra).toBe(7);
+  });
+
   it('não gruda quando está longe de qualquer encaixe', () => {
     const rooms = [rectRoom('sala', 0, 0, 310, 300)];
     const s = floorSnap(rooms, t60, layout(), { x: 0, y: 0 }, { x: 35, y: 27 }, 5);

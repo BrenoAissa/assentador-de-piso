@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEditor } from '../editor/editorStore';
 import { bbox } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
 import type { WallGuide } from '../tiling/snap';
@@ -15,8 +16,8 @@ export type MontarTool = 'start' | 'floor' | 'row' | 'piece';
 
 export const TOOL_HINT: Record<MontarTool, string> = {
   start: 'Clique onde o piso deve começar, por exemplo na porta de entrada. A peça ali fica inteira e os recortes vão para as paredes do outro lado.',
-  floor: 'Arraste o piso inteiro para mudar onde caem os recortes. Arraste o fundo para mover a vista.',
-  row: 'Arraste uma peça para deslizar a fileira dela. Bom para levar o filete para baixo de um móvel.',
+  floor: 'Arraste o piso inteiro para mudar onde caem os recortes; ele gruda quando a peça encosta na parede (Shift: livre). Arraste o fundo para mover a vista.',
+  row: 'Arraste uma peça para deslizar a fileira dela; a ponta gruda na parede (Shift: livre). Bom para levar o filete para baixo de um móvel.',
   piece: 'Arraste uma peça ao longo da fileira para trocar de lugar; as outras se acomodam. Clique numa peça para apagar ou marcar como embaixo de móvel.',
 };
 
@@ -58,6 +59,8 @@ export default function Plan2D(props: Props) {
   const { view, setView, toWorld, fit } = usePanZoom(ref, bounds.w + 2 * MARGIN, bounds.h + 2 * MARGIN);
   const [drag, setDrag] = useState<Drag>(null);
   const [pointer, setPointer] = useState<Point | null>(null);
+  const magnet = useEditor((s) => s.magnet);
+  const setMagnet = useEditor((s) => s.setMagnet);
 
   const ox = bounds.x - MARGIN;
   const oy = bounds.y - MARGIN;
@@ -69,6 +72,8 @@ export default function Plan2D(props: Props) {
   const along = (d: Point) => (vertical ? d.y : d.x);
 
   const k = view.k;
+  /** Alcance do ímã em cm no zoom atual; zero quando está livre (Shift ou Ímã desligado). */
+  const snapTol = (e: { shiftKey: boolean }) => (e.shiftKey || !magnet ? 0 : SNAP_PX / k);
   const tileScreen = Math.min(tile.lengthCm, tile.widthCm) * k;
   const showNumbers = tileScreen >= 24;
   const showCuts = tileScreen >= 52;
@@ -106,7 +111,7 @@ export default function Plan2D(props: Props) {
     setDrag({ ...drag, moved: true, delta });
     const rect = ref.current!.getBoundingClientRect();
     setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    const tol = SNAP_PX / k;
+    const tol = snapTol(e);
     if (drag.kind === 'floor') props.onFloorDrag(delta, false, drag.piece, tol);
     if (drag.kind === 'row' && drag.piece) props.onRowDrag(drag.piece, along(delta), false, tol);
   };
@@ -126,8 +131,8 @@ export default function Plan2D(props: Props) {
       onSelect(d.piece?.key ?? null);
       return;
     }
-    if (d.kind === 'floor') props.onFloorDrag(d.delta, true, d.piece, SNAP_PX / k);
-    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta), true, SNAP_PX / k);
+    if (d.kind === 'floor') props.onFloorDrag(d.delta, true, d.piece, snapTol(e));
+    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta), true, snapTol(e));
     if (d.kind === 'piece' && d.piece) props.onPieceDrop(d.piece, along(toCm(e)));
   };
 
@@ -151,6 +156,14 @@ export default function Plan2D(props: Props) {
       <div className="toolbar">
         <button className="tool" onClick={fit}>
           Enquadrar
+        </button>
+        <button
+          className="tool"
+          aria-pressed={magnet}
+          onClick={() => setMagnet(!magnet)}
+          title="Ímã: o piso e as fileiras grudam quando a peça encosta na parede. Segure Shift para mexer livre na hora."
+        >
+          Ímã
         </button>
       </div>
       <svg

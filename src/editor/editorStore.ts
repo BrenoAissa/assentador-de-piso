@@ -11,6 +11,9 @@ interface EditorState {
   /** Parede destacada no editor enquanto o usuário edita o comprimento dela no painel. */
   highlight: { roomId: string; index: number } | null;
   setHighlight(h: { roomId: string; index: number } | null): void;
+  /** Ímã ligado (cantos, paredes, guias, ângulo reto). Shift desliga na hora. */
+  magnet: boolean;
+  setMagnet(on: boolean): void;
 }
 
 export const useEditor = create<EditorState>((set) => ({
@@ -20,4 +23,6 @@ export const useEditor = create<EditorState>((set) => ({
   requestFit: () => set((s) => ({ fitToken: s.fitToken + 1 })),
   highlight: null,
   setHighlight: (highlight) => set({ highlight }),
+  magnet: true,
+  setMagnet: (magnet) => set({ magnet }),
 }));

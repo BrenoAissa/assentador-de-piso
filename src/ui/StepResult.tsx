@@ -148,7 +148,7 @@ export default function StepResult() {
       return;
     }
     setGuides(snap.guides);
-    setFloorLabel(wallsLabel(snap.guides.length) ?? 'Solte quando as peças encostarem onde você quer');
+    setFloorLabel(wallsLabel(snap.guides.length) ?? (tolCm === 0 ? 'Livre, sem ímã' : 'Solte quando as peças encostarem onde você quer'));
     previewWith(global ? Object.fromEntries(rooms.map((r) => [r.id, o])) : { ...result.roomOrigins, [room!.id]: o }, edits);
   };
 

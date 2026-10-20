@@ -30,8 +30,8 @@ const TOOL_LIST: { id: Tool; label: string; key: string }[] = [
 
 const HINTS: Record<Tool, string> = {
   select:
-    'Clique num cômodo para selecionar e arraste para mudar de lugar (ele encaixa nas paredes vizinhas). Arraste os pontos para ajustar, duplo clique na borda cria um ponto e Delete apaga o ponto selecionado.',
-  draw: 'Clique onde a parede começa. Aponte a direção, digite o comprimento em cm (ex.: 320) e aperte Enter, ou clique. Ângulo reto é automático (Shift libera). Feche no primeiro ponto ou com Enter; Backspace desfaz o último ponto.',
+    'Clique num cômodo para selecionar e arraste para mudar de lugar (ele encaixa nas paredes vizinhas). Arraste os pontos para ajustar (Shift: livre, sem ímã), duplo clique na borda cria um ponto e Delete apaga o ponto selecionado.',
+  draw: 'Clique onde a parede começa. Aponte a direção, digite o comprimento em cm (ex.: 320) e aperte Enter, ou clique. Ângulo reto e encaixes são automáticos; segure Shift para desenhar livre. Feche no primeiro ponto ou com Enter; Backspace desfaz o último ponto.',
   rect: 'Informe a largura e o comprimento: o cômodo aparece ao lado dos outros. Depois arraste para encaixar.',
   calibrate: 'Clique nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
 };
@@ -50,6 +50,10 @@ export default function PlanEditor() {
   const { selectRoom, updateRoom, addRoom, setScale } = useProject.getState();
   const { tool, setTool, fitToken, requestFit } = useEditor();
   const highlight = useEditor((s) => s.highlight);
+  const magnet = useEditor((s) => s.magnet);
+  const setMagnet = useEditor((s) => s.setMagnet);
+  /** Sem ímã: Shift segurado ou botão Ímã desligado. */
+  const isFree = (e: { shiftKey: boolean }) => e.shiftKey || !magnet;
   const plan = project.plan!;
   const drawn = isDrawn(project);
   const pxPerCm = project.scale?.pxPerCm ?? null;
@@ -104,8 +108,10 @@ export default function PlanEditor() {
   /**
    * Ponto do desenho. Ordem do ímã: conectar num canto (outros cômodos ou o próprio desenho),
    * ângulo reto, encostar/alinhar com paredes e cantos; sem ímã, cm inteiros (e grade no 1º ponto).
+   * Livre (Shift ou Ímã desligado): nada puxa, só os cm inteiros na planta desenhada.
    */
   const drawPoint = (raw: Point, free: boolean): GeoSnap => {
+    if (free) return { point: drawn ? snapToGrid(raw, 1) : raw, kind: null, guides: [] };
     const rings = otherRings();
     if (drawPts.length === 0) {
       const s0 = snapToGeometry(raw, rings, [], tolW);
@@ -188,7 +194,7 @@ export default function PlanEditor() {
         const here = toScreen(p);
         if (Math.hypot(first.x - here.x, first.y - here.y) < CLOSE_PX) return finishDrawing(drawPts);
       }
-      const sp = drawPoint(p, e.shiftKey).point;
+      const sp = drawPoint(p, isFree(e)).point;
       const first = drawPts[0];
       if (first && drawPts.length >= 3 && Math.hypot(sp.x - first.x, sp.y - first.y) < 0.01) return finishDrawing(drawPts);
       setDrawPts([...drawPts, sp]);
@@ -236,9 +242,9 @@ export default function PlanEditor() {
     if (drag?.kind === 'vertex' && draft) {
       const ring = draft.ring.slice();
       const sameRoom = draft.ring.filter((_, j) => j !== drag.index);
-      const sv = snapToGeometry(p, otherRings(drag.roomId), sameRoom, tolW);
-      ring[drag.index] = sv.kind ? sv.point : drawn ? snapToGrid(p, 1) : p;
-      setSnapInfo({ kind: sv.kind, guides: sv.guides });
+      const sv = isFree(e) ? null : snapToGeometry(p, otherRings(drag.roomId), sameRoom, tolW);
+      ring[drag.index] = sv?.kind ? sv.point : drawn ? snapToGrid(p, 1) : p;
+      setSnapInfo({ kind: sv?.kind ?? null, guides: sv?.guides ?? [] });
       setDraft({ ...draft, ring });
       if (!drag.moved) setDrag({ ...drag, moved: true });
       return;
@@ -247,13 +253,14 @@ export default function PlanEditor() {
       if (!drag.moved && Math.hypot(e.clientX - drag.screen.x, e.clientY - drag.screen.y) < 4) return;
       const others = project.rooms.filter((r) => r.id !== drag.roomId).map((r) => r.polygonPx);
       const raw = { x: p.x - drag.start.x, y: p.y - drag.start.y };
-      const d = snapMove(drag.base, others, drawn ? snapToGrid(raw, 1) : raw, WALL_GAP_CM * (pxPerCm ?? 1), 10 / k);
+      const step = drawn ? snapToGrid(raw, 1) : raw;
+      const d = isFree(e) ? step : snapMove(drag.base, others, step, WALL_GAP_CM * (pxPerCm ?? 1), 10 / k);
       setDraft({ roomId: drag.roomId, ring: translateRing(drag.base, d.x, d.y) });
       if (!drag.moved) setDrag({ ...drag, moved: true });
       return;
     }
     if (tool === 'draw') {
-      const sp = drawPoint(p, e.shiftKey);
+      const sp = drawPoint(p, isFree(e));
       setHover(sp.point);
       setSnapInfo({ kind: sp.kind, guides: sp.guides });
     } else if (tool !== 'select') setHover(p);
@@ -333,6 +340,14 @@ export default function PlanEditor() {
         ))}
         <button className="tool" onClick={fit} title="Enquadrar a planta">
           Enquadrar
+        </button>
+        <button
+          className="tool"
+          aria-pressed={magnet}
+          onClick={() => setMagnet(!magnet)}
+          title="Ímã: encaixa em cantos, paredes, guias e ângulo reto. Segure Shift para mexer livre na hora."
+        >
+          Ímã
         </button>
       </div>
 

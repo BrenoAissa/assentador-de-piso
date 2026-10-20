@@ -524,8 +524,6 @@ select {
   gap: clamp(24px, 4vw, 64px);
   padding: clamp(24px, 5vw, 72px);
   background-color: var(--papel);
-  background-image: linear-gradient(#e3e6e2 1px, transparent 1px), linear-gradient(90deg, #e3e6e2 1px, transparent 1px);
-  background-size: 24px 24px;
 }
 
 .welcome.over {

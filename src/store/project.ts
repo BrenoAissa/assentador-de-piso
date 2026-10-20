@@ -82,7 +82,7 @@ export const useProject = create<ProjectState>((set, get) => {
       if (old) void deleteImage(old.imageId);
       showImage(blob);
       // planta nova: o ponto de partida da anterior não faz sentido aqui
-      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto' } }));
+      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto', start: undefined } }));
       set({ selectedRoomId: null, history: [] });
     },
 
@@ -91,7 +91,7 @@ export const useProject = create<ProjectState>((set, get) => {
       if (old?.imageId) void deleteImage(old.imageId);
       showImage(null);
       const { plan, scale } = drawnPlan();
-      update((p) => ({ ...p, plan, scale, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto' } }));
+      update((p) => ({ ...p, plan, scale, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto', start: undefined } }));
       set({ selectedRoomId: null, history: [], step: 2 });
     },
 

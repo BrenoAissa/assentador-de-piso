@@ -6,6 +6,7 @@ import CutTable from './CutTable';
 import PlanSvg from './PlanSvg';
 import Summary from './Summary';
 import './print.css';
+import { entrancePiece, entrancePoints } from '../tiling/start';
 
 interface Props {
   result: LayoutResult;
@@ -32,11 +33,16 @@ export default function PrintSheet({ result, rooms, tile, layout, topView }: Pro
       </p>
       <svg viewBox={`${b.x - m} ${b.y - m} ${b.w + 2 * m} ${b.h + 2 * m}`}>
         <PlanSvg result={result} rooms={rooms} fontSize={font} showNumbers showCuts hairline={0.5} scalingStroke />
-        <circle cx={result.originUsed.x} cy={result.originUsed.y} r={font * 0.45} fill="#f2c230" stroke="#22262a" strokeWidth={0.8} />
+        {entrancePoints(layout, rooms).map((p) => {
+          const piece = entrancePiece(result, p);
+          return piece?.shape.map((ring, i) => (
+            <polygon key={`${piece.key}:${i}`} points={ring.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#f2c230" strokeWidth={font * 0.3} />
+          ));
+        })}
       </svg>
       <p className="print-legend">
-        Cinza: peça inteira. Azul: recortada. Vermelho: filete. Borda tracejada: sai da sobra de outra peça. Ponto
-        amarelo: canto de partida da grade.
+        Cinza: peça inteira. Azul: recortada. Vermelho: filete. Borda tracejada: sai da sobra de outra peça. Contorno
+        amarelo: peça da entrada, por onde começar o assentamento.
       </p>
       <Summary summary={result.summary} tile={tile} expanded />
       {topView && (

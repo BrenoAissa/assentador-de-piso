@@ -10,7 +10,7 @@ export function hasEdits(e: ManualEdits): boolean {
 }
 
 /** Campos do layout que mudam a grade (e, portanto, as chaves das peças). */
-const GRID_FIELDS: (keyof LayoutSpec)[] = ['pattern', 'runningOffset', 'rotationDeg', 'gridMode', 'origin'];
+const GRID_FIELDS: (keyof LayoutSpec)[] = ['pattern', 'runningOffset', 'rotationDeg', 'gridMode', 'origin', 'start'];
 
 export function layoutChangeResetsEdits(patch: Partial<LayoutSpec>): boolean {
   return GRID_FIELDS.some((k) => k in patch);

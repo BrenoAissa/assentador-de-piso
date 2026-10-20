@@ -5,6 +5,7 @@ import type { Point } from '../geometry/types';
 import { rowIsStrip, slotStart, targetIndex } from '../tiling/edits';
 import { pitch } from '../tiling/grid';
 import type { WallGuide } from '../tiling/snap';
+import { entrancePiece, entrancePoints } from '../tiling/start';
 import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
 import PlanSvg from './PlanSvg';
@@ -18,7 +19,7 @@ const SNAP_PX = 10;
 export type MontarTool = 'start' | 'floor' | 'row' | 'piece';
 
 export const TOOL_HINT: Record<MontarTool, string> = {
-  start: 'Clique onde o piso deve começar, por exemplo na porta de entrada. A peça ali fica inteira e os recortes vão para as paredes do outro lado.',
+  start: 'Toque na peça da entrada, por exemplo a da porta. Ela fica inteira, ganha a marca amarela e os recortes vão para as paredes do outro lado.',
   floor: 'Arraste o piso inteiro para mudar onde caem os recortes; ele gruda quando a peça encosta na parede (Shift: livre). Arraste o fundo para mover a vista.',
   row: 'Arraste uma peça para deslizar a fileira dela; ela gruda na parede e nas juntas das fileiras vizinhas (Shift: livre). Bom para levar o filete para baixo de um móvel.',
   piece: 'Arraste uma peça ao longo da fileira para trocar de lugar; ela pula de vaga em vaga e as outras se acomodam (Shift: livre). Clique numa peça para apagar ou marcar como embaixo de móvel.',
@@ -83,7 +84,14 @@ export default function Plan2D(props: Props) {
   const showNumbers = tileScreen >= 24;
   const showCuts = tileScreen >= 52;
   const fontSize = 11.5 / k;
-  const origin = result.originUsed;
+  const entrances = useMemo(
+    () =>
+      entrancePoints(layout, rooms).flatMap((p) => {
+        const piece = entrancePiece(result, p);
+        return piece ? [{ piece }] : [];
+      }),
+    [layout, rooms, result],
+  );
   const pieceByKey = useMemo(() => new Map(result.pieces.map((p) => [p.key, p])), [result]);
   const sel = selected ? pieceByKey.get(selected) : undefined;
 
@@ -269,13 +277,9 @@ export default function Plan2D(props: Props) {
                 pointerEvents="none"
               />
             ))}
-          {(tool === 'start' || tool === 'floor') && (
-            <g pointerEvents="none">
-              <line x1={bounds.x - MARGIN / 2} x2={bounds.x + bounds.w + MARGIN / 2} y1={origin.y} y2={origin.y} stroke="#f2c230" strokeWidth={2} strokeDasharray="10 5" vectorEffect="non-scaling-stroke" />
-              <line y1={bounds.y - MARGIN / 2} y2={bounds.y + bounds.h + MARGIN / 2} x1={origin.x} x2={origin.x} stroke="#f2c230" strokeWidth={2} strokeDasharray="10 5" vectorEffect="non-scaling-stroke" />
-              <circle cx={origin.x} cy={origin.y} r={7 / k} fill="#f2c230" stroke="#22262a" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-            </g>
-          )}
+          {entrances.map(({ piece }) => (
+            <EntranceMark key={piece.key} piece={piece} k={k} />
+          ))}
         </g>
       </svg>
       {pointer && props.dragLabel && (
@@ -287,3 +291,27 @@ export default function Plan2D(props: Props) {
     </div>
   );
 }
+
+/** Peça da entrada: contorno amarelo e a etiqueta "Entrada" em cima, do mesmo tamanho em qualquer zoom. */
+export function EntranceMark({ piece, k }: { piece: Piece; k: number }) {
+  const b = bbox(piece.shape);
+  const fs = 12 / k;
+  const w = fs * 4.6;
+  const h = fs * 1.6;
+  const cx = b.x + b.w / 2;
+  return (
+    <g pointerEvents="none">
+      {piece.shape.map((ring, i) => (
+        <g key={i}>
+          <polygon points={ring.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#22262a" strokeWidth={6} vectorEffect="non-scaling-stroke" />
+          <polygon points={ring.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#f2c230" strokeWidth={3.5} vectorEffect="non-scaling-stroke" />
+        </g>
+      ))}
+      <rect x={cx - w / 2} y={b.y - h - fs * 0.35} width={w} height={h} rx={h / 2} fill="#f2c230" stroke="#22262a" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+      <text x={cx} y={b.y - fs * 0.35 - h / 2 + fs * 0.36} fontSize={fs} fontWeight={700} textAnchor="middle" fill="#22262a">
+        Entrada
+      </text>
+    </g>
+  );
+}
+

@@ -34,6 +34,8 @@ export interface Room {
   issues: RoomIssue[];
   /** Origem da grade no modo por cômodo; ausente = automática. */
   origin?: Point;
+  /** Peça da entrada no modo por cômodo (ponto tocado, em cm). */
+  start?: Point;
 }
 
 export interface Project {

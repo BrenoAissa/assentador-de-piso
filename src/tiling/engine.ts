@@ -8,6 +8,7 @@ import { applyRowOrder, pieceKey, rowKey } from './edits';
 import { assignLeftovers } from './leftovers';
 import { optimizeOrigin } from './optimize';
 import { NO_EDITS, type LayoutResult, type LayoutSpec, type ManualEdits, type Piece, type RoomCm, type TileSpec } from './types';
+import { startOrigin } from './start';
 
 const MIN_AREA = 0.5;
 
@@ -98,16 +99,24 @@ export function computeLayout(
   };
 }
 
-/** Resolve a origem automática (global ou por cômodo) e calcula a paginação. */
+/**
+ * Resolve a origem (a peça da entrada, se marcada; senão a salva ou a automática), global ou por
+ * cômodo, e calcula a paginação.
+ */
 export function solveLayout(rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits: ManualEdits = NO_EDITS): LayoutResult {
   const valid = rooms.filter((r) => isSimple(r.ring));
   const origins: Record<string, Point> = {};
   if (layout.gridMode === 'global') {
-    const o = layout.origin === 'auto' ? optimizeOrigin(valid, tile, layout) : layout.origin;
+    const o = layout.start
+      ? startOrigin(valid, tile, layout, layout.start)
+      : layout.origin === 'auto'
+        ? optimizeOrigin(valid, tile, layout)
+        : layout.origin;
     for (const r of rooms) origins[r.id] = o;
   } else {
     for (const r of rooms) {
-      origins[r.id] = r.origin ?? (isSimple(r.ring) ? optimizeOrigin([r], tile, layout) : { x: 0, y: 0 });
+      const ok = isSimple(r.ring);
+      origins[r.id] = r.start && ok ? startOrigin([r], tile, layout, r.start) : (r.origin ?? (ok ? optimizeOrigin([r], tile, layout) : { x: 0, y: 0 }));
     }
   }
   return computeLayout(rooms, tile, layout, origins, edits);

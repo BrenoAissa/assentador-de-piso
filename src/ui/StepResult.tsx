@@ -16,7 +16,6 @@ import { moveInOrder, rowIsStrip, rowKey, targetIndex } from '../tiling/edits';
 import { computeLayout } from '../tiling/engine';
 import { pitch } from '../tiling/grid';
 import { floorSnap, rowSnap, type RowMatch, type WallGuide } from '../tiling/snap';
-import { startOrigin } from '../tiling/start';
 import type { LayoutResult, ManualEdits, Piece } from '../tiling/types';
 import { CUT_TYPE_LABEL, cutLabel, fmt } from './format';
 import { OrientationPicker, PatternPicker } from './LayoutPickers';
@@ -32,7 +31,7 @@ const TABS: { id: ResultTab; label: string }[] = [
 ];
 
 const TOOLS: { id: MontarTool; label: string }[] = [
-  { id: 'start', label: 'Começar aqui' },
+  { id: 'start', label: 'Marcar a entrada' },
   { id: 'floor', label: 'Arrastar o piso' },
   { id: 'row', label: 'Arrastar fileira' },
   { id: 'piece', label: 'Mexer na peça' },
@@ -121,12 +120,13 @@ export default function StepResult() {
 
   const roomAt = (p: Point) => rooms.find((r) => pointInPolygon(p, r.ring));
 
+  /** Guarda o ponto tocado como entrada; a montagem posiciona a grade para a peça dali ficar inteira. */
   const onStart = (p: Point) => {
     if (global) {
-      setLayout({ origin: startOrigin(rooms, tile, layout, p) });
+      setLayout({ start: p });
     } else {
       const room = roomAt(p);
-      if (room) updateRoom(room.id, { origin: startOrigin([room], tile, layout, p) });
+      if (room) updateRoom(room.id, { start: p });
     }
     setSelected(null);
     setNotice(null);
@@ -144,8 +144,9 @@ export default function StepResult() {
     if (done) {
       setGuides([]);
       setFloorLabel(null);
-      if (global) setLayout({ origin: o });
-      else updateRoom(room!.id, { origin: o });
+      // arrastar o piso escolhe o começo à mão: a marca de entrada sai
+      if (global) setLayout({ origin: o, start: undefined });
+      else updateRoom(room!.id, { origin: o, start: undefined });
       return;
     }
     setGuides(snap.guides);
@@ -349,12 +350,18 @@ export default function StepResult() {
               Mostrar os móveis da planta
             </label>
           )}
-          {global && layout.origin !== 'auto' && (
+          {global && (layout.origin !== 'auto' || layout.start) && (
             <div>
-              <button className="btn btn-sm btn-quiet" onClick={() => setLayout({ origin: 'auto' })}>
-                Deixar o app escolher o começo (menos filetes)
+              <button className="btn btn-sm btn-quiet" onClick={() => setLayout({ origin: 'auto', start: undefined })}>
+                {layout.start ? 'Tirar a entrada e deixar o app escolher (menos filetes)' : 'Deixar o app escolher o começo (menos filetes)'}
               </button>
             </div>
+          )}
+          {(layout.start || rooms.some((r) => r.start)) && shown && shown.summary.slivers > 0 && (
+            <p className="muted">
+              Para a peça da entrada ficar inteira, os filetes foram para as paredes do outro lado. Dá para escondê-los: em
+              "Arrastar fileira", leve o filete para baixo de um móvel, ou toque na peça e marque "Fica embaixo de móvel".
+            </p>
           )}
           <ul className="legend">
             <li>
@@ -372,6 +379,11 @@ export default function StepResult() {
             <li>
               <i className="dashed" style={{ background: PIECE_FILL.cut }} /> Sai de sobra
             </li>
+            {(layout.start || rooms.some((r) => r.start)) && (
+              <li>
+                <i className="entrance" /> Entrada
+              </li>
+            )}
           </ul>
         </section>
 

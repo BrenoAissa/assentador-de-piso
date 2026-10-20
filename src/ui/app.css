@@ -959,6 +959,12 @@ select {
   box-shadow: 0 0 0 1px var(--rejunte);
 }
 
+.legend i.entrance {
+  background: #fff;
+  border: 3px solid var(--fita);
+  box-shadow: 0 0 0 1px var(--grafite);
+}
+
 .legend i.dashed {
   border: 1.5px dashed #1f4f8a;
   box-shadow: none;

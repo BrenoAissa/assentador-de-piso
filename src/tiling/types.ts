@@ -22,6 +22,11 @@ export interface LayoutSpec {
   rotationDeg: 0 | 90;
   gridMode: 'global' | 'perRoom';
   origin: Point | 'auto';
+  /**
+   * Peça da entrada (ponto tocado, em cm), no modo de grade contínua. Quando existe, a grade é
+   * posicionada para a peça sob esse ponto ficar inteira e vale mais que `origin`.
+   */
+  start?: Point;
   minCutCm: number;
   minCutFraction: number;
   /** Perda do disco de corte, em cm. */
@@ -34,6 +39,8 @@ export interface RoomCm {
   ring: Ring;
   /** Origem da grade do cômodo no modo por cômodo; ausente = automática. */
   origin?: Point;
+  /** Peça da entrada do cômodo no modo por cômodo; vale mais que `origin`. */
+  start?: Point;
 }
 
 export type PieceKind = 'full' | 'cut' | 'sliver';

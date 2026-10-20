@@ -32,6 +32,7 @@ export function roomsInCm(project: Project): RoomCm[] {
       name: label,
       ring: scaleRing(r.polygonPx, 1 / scale.pxPerCm),
       ...(r.origin ? { origin: r.origin } : {}),
+      ...(r.start ? { start: r.start } : {}),
     }));
 }
 

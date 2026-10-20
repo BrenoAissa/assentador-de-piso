@@ -109,3 +109,77 @@ export function snapMove(ring: Ring, others: Ring[], delta: Point, gap: number, 
   }
   return { x: delta.x + (bestX ?? 0), y: delta.y + (bestY ?? 0) };
 }
+
+export interface Guide {
+  a: Point;
+  b: Point;
+}
+
+export interface GeoSnap {
+  point: Point;
+  /** vertex: conectou num canto; edge: encostou numa parede; align: alinhou com um canto (guia). */
+  kind: 'vertex' | 'edge' | 'align' | null;
+  guides: Guide[];
+}
+
+function nearestOnEdges(p: Point, rings: Ring[]): { point: Point; dist: number } | null {
+  let best: { point: Point; dist: number } | null = null;
+  for (const ring of rings) {
+    for (let i = 0, n = ring.length; i < n; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % n];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+      const q = { x: a.x + t * dx, y: a.y + t * dy };
+      const dist = Math.hypot(p.x - q.x, p.y - q.y);
+      if (!best || dist < best.dist) best = { point: q, dist };
+    }
+  }
+  return best;
+}
+
+/**
+ * Ímã do desenho, na ordem: conectar num canto (de outro cômodo ou do próprio desenho),
+ * encostar numa parede, alinhar com um canto (com guia). `lock` diz qual coordenada pode
+ * mudar quando a parede já está travada num eixo ('x' = parede horizontal, só o x anda).
+ */
+export function snapToGeometry(p: Point, rings: Ring[], extra: Point[], tol: number, lock?: 'x' | 'y'): GeoSnap {
+  const verts = [...rings.flat(), ...extra];
+  if (!lock) {
+    let best: Point | null = null;
+    let bestD = tol;
+    for (const v of verts) {
+      const d = Math.hypot(v.x - p.x, v.y - p.y);
+      if (d <= bestD) {
+        best = v;
+        bestD = d;
+      }
+    }
+    if (best) return { point: { x: best.x, y: best.y }, kind: 'vertex', guides: [] };
+    const edge = nearestOnEdges(p, rings);
+    if (edge && edge.dist <= tol) return { point: edge.point, kind: 'edge', guides: [] };
+  }
+  let x = p.x;
+  let y = p.y;
+  const guides: Guide[] = [];
+  if (lock !== 'y') {
+    let best: Point | null = null;
+    for (const v of verts) if (Math.abs(v.x - p.x) <= tol && (!best || Math.abs(v.x - p.x) < Math.abs(best.x - p.x))) best = v;
+    if (best) x = best.x;
+    if (best) guides.push({ a: best, b: { x: best.x, y: p.y } });
+  }
+  if (lock !== 'x') {
+    let best: Point | null = null;
+    for (const v of verts) if (Math.abs(v.y - p.y) <= tol && (!best || Math.abs(v.y - p.y) < Math.abs(best.y - p.y))) best = v;
+    if (best) y = best.y;
+    if (best) guides.push({ a: best, b: { x: p.x, y: best.y } });
+  }
+  if (guides.length > 0) {
+    // as guias terminam no ponto final, já com as duas coordenadas ajustadas
+    for (const g of guides) g.b = { x, y };
+    return { point: { x, y }, kind: 'align', guides };
+  }
+  return { point: p, kind: null, guides: [] };
+}

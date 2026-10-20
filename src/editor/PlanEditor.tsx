@@ -5,7 +5,7 @@ import { useProject } from '../store/project';
 import { isDrawn } from '../types';
 import { fmt } from '../ui/format';
 import { usePanZoom, type View } from '../ui/usePanZoom';
-import { placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGrid, translateRing } from './drawing';
+import { placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGeometry, snapToGrid, translateRing, type GeoSnap } from './drawing';
 import { useEditor, type Tool } from './editorStore';
 import { calibrationScale, insertVertex, nearestEdge, removeVertex, roomSizeLabel } from './ops';
 
@@ -76,6 +76,8 @@ export default function PlanEditor() {
   const [calib, setCalib] = useState<Point[]>([]);
   const [calibCm, setCalibCm] = useState('');
   const [hover, setHover] = useState<Point | null>(null);
+  /** Resultado do ímã no ponto atual (conectado, encostado, alinhado) e as guias. */
+  const [snapInfo, setSnapInfo] = useState<Pick<GeoSnap, 'kind' | 'guides'>>({ kind: null, guides: [] });
   const [rect, setRect] = useState({ name: '', w: '', h: '' });
 
   const k = view.k;
@@ -96,14 +98,32 @@ export default function PlanEditor() {
     if (tool === 'draw' && drawPts.length > 0) lengthRef.current?.focus();
   }, [tool, drawPts.length]);
 
-  /** Ponto do desenho: grade no primeiro clique, ângulo reto e cm inteiros nos seguintes. */
-  const drawPoint = (raw: Point, free: boolean): Point => {
-    if (drawPts.length === 0) return drawn ? snapToGrid(raw, GRID_CM) : raw;
+  const tolW = 10 / view.k;
+  const otherRings = (exceptId?: string) => project.rooms.filter((r) => r.id !== exceptId).map((r) => r.polygonPx);
+
+  /**
+   * Ponto do desenho. Ordem do ímã: conectar num canto (outros cômodos ou o próprio desenho),
+   * ângulo reto, encostar/alinhar com paredes e cantos; sem ímã, cm inteiros (e grade no 1º ponto).
+   */
+  const drawPoint = (raw: Point, free: boolean): GeoSnap => {
+    const rings = otherRings();
+    if (drawPts.length === 0) {
+      const s0 = snapToGeometry(raw, rings, [], tolW);
+      return s0.kind ? s0 : { point: drawn ? snapToGrid(raw, GRID_CM) : raw, kind: null, guides: [] };
+    }
     const last = drawPts[drawPts.length - 1];
-    const p = snapAngle(last, raw, !free);
-    if (!pxPerCm) return p;
-    const cm = Math.round(Math.hypot(p.x - last.x, p.y - last.y) / pxPerCm);
-    return pointAtDistance(last, p, cm * pxPerCm);
+    const own = drawPts.slice(0, -1);
+    const v = snapToGeometry(raw, rings, own, tolW);
+    if (v.kind === 'vertex') return v;
+    let p = snapAngle(last, raw, !free);
+    const lock = p.y === last.y && p.x !== last.x ? 'x' : p.x === last.x && p.y !== last.y ? 'y' : undefined;
+    const a = snapToGeometry(p, rings, own, tolW, lock);
+    if (a.kind) return a;
+    if (pxPerCm) {
+      const cm = Math.round(Math.hypot(p.x - last.x, p.y - last.y) / pxPerCm);
+      p = pointAtDistance(last, p, cm * pxPerCm);
+    }
+    return { point: p, kind: null, guides: [] };
   };
 
   const finishDrawing = (pts: Point[]) => {
@@ -168,7 +188,10 @@ export default function PlanEditor() {
         const here = toScreen(p);
         if (Math.hypot(first.x - here.x, first.y - here.y) < CLOSE_PX) return finishDrawing(drawPts);
       }
-      setDrawPts([...drawPts, drawPoint(p, e.shiftKey)]);
+      const sp = drawPoint(p, e.shiftKey).point;
+      const first = drawPts[0];
+      if (first && drawPts.length >= 3 && Math.hypot(sp.x - first.x, sp.y - first.y) < 0.01) return finishDrawing(drawPts);
+      setDrawPts([...drawPts, sp]);
       setTyped('');
       return;
     }
@@ -212,7 +235,10 @@ export default function PlanEditor() {
     const p = toWorld(e.clientX, e.clientY);
     if (drag?.kind === 'vertex' && draft) {
       const ring = draft.ring.slice();
-      ring[drag.index] = drawn ? snapToGrid(p, 1) : p;
+      const sameRoom = draft.ring.filter((_, j) => j !== drag.index);
+      const sv = snapToGeometry(p, otherRings(drag.roomId), sameRoom, tolW);
+      ring[drag.index] = sv.kind ? sv.point : drawn ? snapToGrid(p, 1) : p;
+      setSnapInfo({ kind: sv.kind, guides: sv.guides });
       setDraft({ ...draft, ring });
       if (!drag.moved) setDrag({ ...drag, moved: true });
       return;
@@ -226,11 +252,15 @@ export default function PlanEditor() {
       if (!drag.moved) setDrag({ ...drag, moved: true });
       return;
     }
-    if (tool === 'draw') setHover(drawPoint(p, e.shiftKey));
-    else if (tool !== 'select') setHover(p);
+    if (tool === 'draw') {
+      const sp = drawPoint(p, e.shiftKey);
+      setHover(sp.point);
+      setSnapInfo({ kind: sp.kind, guides: sp.guides });
+    } else if (tool !== 'select') setHover(p);
   };
 
   const onPointerUp = () => {
+    setSnapInfo({ kind: null, guides: [] });
     if ((drag?.kind === 'vertex' || drag?.kind === 'move') && draft && drag.moved) {
       updateRoom(draft.roomId, { polygonPx: draft.ring });
     }
@@ -310,7 +340,10 @@ export default function PlanEditor() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => {
+          setHover(null);
+          setSnapInfo({ kind: null, guides: [] });
+        }}
         onDoubleClick={onDoubleClick}
         onContextMenu={(e) => e.preventDefault()}
         style={{ cursor: tool === 'select' ? (drag?.kind === 'pan' ? 'grabbing' : drag?.kind === 'move' ? 'move' : 'default') : 'crosshair' }}
@@ -443,6 +476,29 @@ export default function PlanEditor() {
             </g>
           )}
 
+          {snapInfo.guides.map((g, i) => (
+            <line
+              key={`guia${i}`}
+              x1={g.a.x}
+              y1={g.a.y}
+              x2={g.b.x}
+              y2={g.b.y}
+              stroke="#2f5f99"
+              strokeWidth={1.5}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+          ))}
+          {snapInfo.kind && (tool === 'draw' ? hover : drag?.kind === 'vertex' && draft ? draft.ring[drag.index] : null) && (() => {
+            const at = tool === 'draw' ? hover! : draft!.ring[(drag as { index: number }).index];
+            return snapInfo.kind === 'vertex' ? (
+              <circle cx={at.x} cy={at.y} r={10 / k} fill="none" stroke="#2f7d4f" strokeWidth={2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+            ) : snapInfo.kind === 'edge' ? (
+              <rect x={at.x - 6 / k} y={at.y - 6 / k} width={12 / k} height={12 / k} fill="none" stroke="#2f7d4f" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+            ) : null;
+          })()}
+
           {tool === 'calibrate' && calib.length > 0 && (
             <g pointerEvents="none">
               {calibEnd && (
@@ -502,7 +558,9 @@ export default function PlanEditor() {
 
       {badgeAt && (pxPerCm || typed) && (
         <div className={`measure-badge${typed ? ' typing' : ''}`} style={{ left: badgeAt.x, top: badgeAt.y }}>
-          {typed ? `${typed} cm, Enter para confirmar` : lenLabel(liveLen)}
+          {typed
+            ? `${typed} cm, Enter para confirmar`
+            : `${lenLabel(liveLen)}${snapInfo.kind === 'vertex' ? ', conectado' : snapInfo.kind === 'edge' ? ', na parede' : ''}`}
         </div>
       )}
 

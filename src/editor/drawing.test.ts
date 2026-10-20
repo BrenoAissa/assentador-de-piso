@@ -9,6 +9,7 @@ import {
   setEdgeLength,
   snapAngle,
   snapMove,
+  snapToGeometry,
   snapToGrid,
   translateRing,
 } from './drawing';
@@ -89,6 +90,46 @@ describe('edgeLengths e setEdgeLength', () => {
     expect(edgeLengths(r)[1]).toBeCloseTo(250);
     expect(r[0]).toEqual({ x: 0, y: 0 });
     expect(r[1]).toEqual({ x: 300, y: 0 });
+  });
+});
+
+describe('snapToGeometry (ímã de pontos, guias e paredes)', () => {
+  const room = rectRing(0, 0, 300, 200);
+
+  it('conecta no canto de outro cômodo quando chega perto', () => {
+    const s = snapToGeometry({ x: 304, y: 197 }, [room], [], 8);
+    expect(s.kind).toBe('vertex');
+    expect(s.point).toEqual({ x: 300, y: 200 });
+  });
+
+  it('alinha com um canto (guia) quando só uma coordenada está perto', () => {
+    const s = snapToGeometry({ x: 297, y: 420 }, [room], [], 8);
+    expect(s.kind).toBe('align');
+    expect(s.point).toEqual({ x: 300, y: 420 });
+    expect(s.guides).toHaveLength(1);
+  });
+
+  it('encosta na parede quando está perto dela, longe dos cantos', () => {
+    const s = snapToGeometry({ x: 150, y: 205 }, [room], [], 8);
+    expect(s.kind).toBe('edge');
+    expect(s.point).toEqual({ x: 150, y: 200 });
+  });
+
+  it('pontos extras (o próprio desenho) também puxam', () => {
+    const s = snapToGeometry({ x: 503, y: 498 }, [], [{ x: 500, y: 500 }], 8);
+    expect(s.point).toEqual({ x: 500, y: 500 });
+  });
+
+  it('longe de tudo, fica onde está', () => {
+    expect(snapToGeometry({ x: 700, y: 700 }, [room], [], 8)).toEqual({ point: { x: 700, y: 700 }, kind: null, guides: [] });
+  });
+
+  it('com eixo travado, só alinha a coordenada livre', () => {
+    // parede horizontal sendo desenhada em y = 420: só o x pode alinhar
+    const s = snapToGeometry({ x: 297, y: 420 }, [room], [], 8, 'x');
+    expect(s.point).toEqual({ x: 300, y: 420 });
+    const v = snapToGeometry({ x: 297, y: 203 }, [room], [], 8, 'x');
+    expect(v.point.y).toBe(203);
   });
 });
 

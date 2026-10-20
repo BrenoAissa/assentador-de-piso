@@ -993,6 +993,10 @@ select {
   transform: translate(14px, -28px);
 }
 
+.measure-badge.snapped {
+  background: var(--ok);
+}
+
 .measure-badge.typing {
   background: var(--fita);
   color: var(--grafite);

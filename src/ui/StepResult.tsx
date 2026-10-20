@@ -15,9 +15,10 @@ import { solveInWorker } from '../tiling/client';
 import { moveInOrder, rowIsStrip, rowKey, targetIndex } from '../tiling/edits';
 import { computeLayout } from '../tiling/engine';
 import { pitch } from '../tiling/grid';
+import { floorSnap, rowSnap, type WallGuide } from '../tiling/snap';
 import { startOrigin } from '../tiling/start';
 import type { LayoutResult, ManualEdits, Piece } from '../tiling/types';
-import { CUT_TYPE_LABEL, cutLabel } from './format';
+import { CUT_TYPE_LABEL, cutLabel, fmt } from './format';
 import { OrientationPicker, PatternPicker } from './LayoutPickers';
 
 export type ResultTab = 'montar' | '3d' | 'cuts' | 'compare';
@@ -62,6 +63,9 @@ export default function StepResult() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [topView, setTopView] = useState<string | null>(null);
+  const [guides, setGuides] = useState<WallGuide[]>([]);
+  const [floorLabel, setFloorLabel] = useState<string | null>(null);
+  const [dragRow, setDragRow] = useState<{ roomId: string; row: number } | null>(null);
   const [printing, setPrinting] = useState(false);
   const frame = useRef(0);
 
@@ -127,32 +131,64 @@ export default function StepResult() {
     setNotice(null);
   };
 
-  const onFloorDrag = (delta: Point, done: boolean, piece?: Piece) => {
+  const wallsLabel = (n: number) => (n === 0 ? null : n === 1 ? 'Peças inteiras encostadas nesta parede' : `Peças inteiras encostadas em ${n} paredes`);
+
+  const onFloorDrag = (delta: Point, done: boolean, piece: Piece | undefined, tolCm: number) => {
     if (!result) return;
-    const move = (o: Point) => ({ x: o.x + delta.x, y: o.y + delta.y });
-    if (global) {
-      const o = move(result.originUsed);
-      if (done) setLayout({ origin: o });
-      else previewWith(Object.fromEntries(rooms.map((r) => [r.id, o])), edits);
+    const room = !global && piece ? rooms.find((r) => r.id === piece.roomId) : undefined;
+    if (!global && !room) return;
+    const base = global ? result.originUsed : result.roomOrigins[room!.id];
+    const snap = floorSnap(global ? rooms : [room!], tile, layout, base, delta, tolCm);
+    const o = { x: base.x + snap.delta.x, y: base.y + snap.delta.y };
+    if (done) {
+      setGuides([]);
+      setFloorLabel(null);
+      if (global) setLayout({ origin: o });
+      else updateRoom(room!.id, { origin: o });
       return;
     }
-    if (!piece) return;
-    const o = move(result.roomOrigins[piece.roomId]);
-    if (done) updateRoom(piece.roomId, { origin: o });
-    else previewWith({ ...result.roomOrigins, [piece.roomId]: o }, edits);
+    setGuides(snap.guides);
+    setFloorLabel(wallsLabel(snap.guides.length) ?? 'Solte quando as peças encostarem onde você quer');
+    previewWith(global ? Object.fromEntries(rooms.map((r) => [r.id, o])) : { ...result.roomOrigins, [room!.id]: o }, edits);
   };
 
-  const onRowDrag = (piece: Piece, delta: number, done: boolean) => {
+  const onRowDrag = (piece: Piece, delta: number, done: boolean, tolCm: number) => {
     if (!result) return;
+    const room = rooms.find((r) => r.id === piece.roomId);
+    if (!room) return;
     const key = rowKey(piece.roomId, piece.row);
+    const snap = rowSnap(room, tile, layout, result.roomOrigins[room.id], piece.row, (edits.rowShift[key] ?? 0) + delta, tolCm);
     const next: ManualEdits = {
       ...edits,
-      rowShift: { ...edits.rowShift, [key]: (edits.rowShift[key] ?? 0) + delta },
+      rowShift: { ...edits.rowShift, [key]: snap.extra },
       rowOrder: omit(edits.rowOrder, key),
     };
-    if (done) setEdits(next);
-    else previewWith(result.roomOrigins, next);
+    if (done) {
+      setGuides([]);
+      setDragRow(null);
+      setEdits(next);
+      return;
+    }
+    setGuides(snap.guides);
+    setDragRow({ roomId: piece.roomId, row: piece.row });
+    previewWith(result.roomOrigins, next);
   };
+
+  /** "Pontas da fileira: inteira e 38 cm" para a fileira sendo arrastada. */
+  const rowLabel = (() => {
+    if (!dragRow || !shown) return null;
+    const along = (p: Piece) => {
+      const b = bbox(p.shape);
+      return vertical ? { pos: b.y, len: b.h } : { pos: b.x, len: b.w };
+    };
+    const row = shown.pieces.filter((p) => p.roomId === dragRow.roomId && p.row === dragRow.row).sort((a, b) => along(a).pos - along(b).pos);
+    if (row.length === 0) return null;
+    // a fileira corre no comprimento da peça (a rotação só troca os eixos da planta)
+    const L = tile.lengthCm;
+    const end = (p: Piece) => (Math.abs(along(p).len - L) < 0.1 ? 'inteira' : `${fmt(along(p).len)} cm`);
+    const text = `Pontas da fileira: ${end(row[0])} e ${end(row[row.length - 1])}`;
+    return guides.length ? `${text}, encostada na parede` : text;
+  })();
 
   const onPieceDrop = (piece: Piece, axisPos: number) => {
     if (!shown) return;
@@ -232,6 +268,8 @@ export default function StepResult() {
               onFloorDrag={onFloorDrag}
               onRowDrag={onRowDrag}
               onPieceDrop={onPieceDrop}
+              guides={guides}
+              dragLabel={dragRow ? rowLabel : floorLabel}
             />
           ) : tab === '3d' ? (
             <Suspense fallback={<div className="center-msg">Carregando o 3D…</div>}>

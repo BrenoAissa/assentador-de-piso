@@ -1,12 +1,15 @@
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { bbox } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
+import type { WallGuide } from '../tiling/snap';
 import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
 import PlanSvg from './PlanSvg';
 
 const MARGIN = 40;
 const CLICK_PX = 4;
+/** Distância (px de tela) em que o piso "gruda" na parede. */
+const SNAP_PX = 10;
 
 export type MontarTool = 'start' | 'floor' | 'row' | 'piece';
 
@@ -28,10 +31,17 @@ interface Props {
   selected: string | null;
   onSelect(key: string | null): void;
   onStart(p: Point): void;
-  /** Deslocamento em cm desde o início do arraste; `piece` é a peça onde o arraste começou. */
-  onFloorDrag(delta: Point, done: boolean, piece?: Piece): void;
+  /**
+   * Deslocamento em cm desde o início do arraste; `piece` é a peça onde o arraste começou;
+   * `tolCm` é a distância em cm em que o ímã das paredes age, no zoom atual.
+   */
+  onFloorDrag(delta: Point, done: boolean, piece: Piece | undefined, tolCm: number): void;
   /** Deslocamento em cm ao longo da fileira. */
-  onRowDrag(piece: Piece, delta: number, done: boolean): void;
+  onRowDrag(piece: Piece, delta: number, done: boolean, tolCm: number): void;
+  /** Paredes onde as peças estão encostadas durante o arraste (acendem). */
+  guides?: WallGuide[];
+  /** Texto junto ao cursor durante o arraste. */
+  dragLabel?: string | null;
   /** Posição do ponteiro ao longo da fileira (cm) quando a peça é solta. */
   onPieceDrop(piece: Piece, axisPos: number): void;
 }
@@ -47,6 +57,7 @@ export default function Plan2D(props: Props) {
   const bounds = useMemo(() => bbox(rooms.map((r) => r.ring)), [rooms]);
   const { view, setView, toWorld, fit } = usePanZoom(ref, bounds.w + 2 * MARGIN, bounds.h + 2 * MARGIN);
   const [drag, setDrag] = useState<Drag>(null);
+  const [pointer, setPointer] = useState<Point | null>(null);
 
   const ox = bounds.x - MARGIN;
   const oy = bounds.y - MARGIN;
@@ -93,13 +104,17 @@ export default function Plan2D(props: Props) {
     const cm = toCm(e);
     const delta = { x: Math.round((cm.x - drag.startCm.x) * 2) / 2, y: Math.round((cm.y - drag.startCm.y) * 2) / 2 };
     setDrag({ ...drag, moved: true, delta });
-    if (drag.kind === 'floor') props.onFloorDrag(delta, false, drag.piece);
-    if (drag.kind === 'row' && drag.piece) props.onRowDrag(drag.piece, along(delta), false);
+    const rect = ref.current!.getBoundingClientRect();
+    setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const tol = SNAP_PX / k;
+    if (drag.kind === 'floor') props.onFloorDrag(delta, false, drag.piece, tol);
+    if (drag.kind === 'row' && drag.piece) props.onRowDrag(drag.piece, along(delta), false, tol);
   };
 
   const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
     const d = drag;
     setDrag(null);
+    setPointer(null);
     if (!d) return;
     if (d.kind === 'pan') {
       if (d.moved) return;
@@ -111,8 +126,8 @@ export default function Plan2D(props: Props) {
       onSelect(d.piece?.key ?? null);
       return;
     }
-    if (d.kind === 'floor') props.onFloorDrag(d.delta, true, d.piece);
-    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta), true);
+    if (d.kind === 'floor') props.onFloorDrag(d.delta, true, d.piece, SNAP_PX / k);
+    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta), true, SNAP_PX / k);
     if (d.kind === 'piece' && d.piece) props.onPieceDrop(d.piece, along(toCm(e)));
   };
 
@@ -179,6 +194,21 @@ export default function Plan2D(props: Props) {
                 pointerEvents="none"
               />
             ))}
+          {props.guides?.map((g, i) => (
+            <line
+              key={`parede${i}`}
+              x1={g.a.x}
+              y1={g.a.y}
+              x2={g.b.x}
+              y2={g.b.y}
+              stroke="#2f7d4f"
+              strokeWidth={6}
+              strokeLinecap="round"
+              opacity={0.85}
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+          ))}
           {ghost &&
             ghostShift &&
             ghost.piece!.shape.map((ring, i) => (
@@ -201,6 +231,11 @@ export default function Plan2D(props: Props) {
           )}
         </g>
       </svg>
+      {pointer && props.dragLabel && (
+        <div className={`measure-badge${props.guides?.length ? ' snapped' : ''}`} style={{ left: pointer.x, top: pointer.y }}>
+          {props.dragLabel}
+        </div>
+      )}
       <p className="hint">{TOOL_HINT[tool]}</p>
     </div>
   );

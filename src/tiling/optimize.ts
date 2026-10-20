@@ -9,7 +9,7 @@ const TOP_K = 20;
 const AXIS_TOL = 1e-6;
 
 /** Aresta de parede alinhada aos eixos, no referencial da paginação. */
-interface AxisEdge {
+export interface AxisEdge {
   /** Coordenada fixa (x de aresta vertical, y de aresta horizontal). */
   at: number;
   from: number;
@@ -18,7 +18,7 @@ interface AxisEdge {
   interiorLow: boolean;
 }
 
-function axisEdges(rings: Ring[]): { v: AxisEdge[]; h: AxisEdge[] } {
+export function axisEdges(rings: Ring[]): { v: AxisEdge[]; h: AxisEdge[] } {
   const v: AxisEdge[] = [];
   const h: AxisEdge[] = [];
   for (const ring of rings) {

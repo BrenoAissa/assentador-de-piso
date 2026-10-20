@@ -578,8 +578,6 @@ select {
   font-size: 0.86rem;
   color: var(--grafite-2);
   max-width: 30em;
-  padding-left: 12px;
-  border-left: 3px solid var(--fita);
 }
 
 .hero-plan {

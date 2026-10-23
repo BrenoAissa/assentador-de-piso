@@ -1,14 +1,14 @@
 import { create } from 'zustand';
+import { withFloorLayout, withFloorTile, withNewFloor, withoutFloor, withRoomFloor } from '../floors';
 import { deleteImage, loadImage, loadProject, saveImage, saveProject } from '../persistence/db';
 import { NO_EDITS, type LayoutResult, type ManualEdits } from '../tiling/types';
-import { drawnPlan, emptyProject, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
-import { layoutChangeResetsEdits, pushHistory } from './edits';
+import { drawnPlan, emptyProject, type Floor, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
+import { pushHistory } from './edits';
 import { computeIssues, type Step } from './issues';
 
 /** Estado que "Desfazer" restaura. */
 interface Snapshot {
-  tile: TileSpec;
-  layout: LayoutSpec;
+  floors: Floor[];
   edits: ManualEdits;
 }
 
@@ -32,9 +32,17 @@ interface ProjectState {
   addRoom(room: Room): void;
   updateRoom(id: string, patch: Partial<Room>): void;
   removeRoom(id: string): void;
-  setTile(patch: Partial<TileSpec>): void;
-  /** Muda o layout; mudanças que mexem na grade desfazem os ajustes manuais (e entram no histórico). */
-  setLayout(patch: Partial<LayoutSpec>): void;
+  /** Muda a peça de um piso; os ajustes manuais dos cômodos dele saem (e entram no histórico). */
+  setTile(floorId: string, patch: Partial<TileSpec>): void;
+  /** Muda o layout de um piso; mudanças que mexem na grade desfazem os ajustes dele (e entram no histórico). */
+  setLayout(floorId: string, patch: Partial<LayoutSpec>): void;
+  /** Cria um piso novo copiando rejunte e compra de `copyFrom`; devolve o id dele. */
+  addFloor(copyFrom: string): string;
+  /** Apaga um piso (menos o primeiro); os cômodos dele voltam ao primeiro piso. */
+  removeFloor(id: string): void;
+  renameFloor(id: string, name: string): void;
+  /** Escolhe o piso do cômodo (null = sem piso). */
+  setRoomFloor(roomId: string, floorId: string | null): void;
   /** Troca os ajustes manuais, guardando o passo anterior no histórico. */
   setEdits(edits: ManualEdits): void;
   undo(): void;
@@ -55,9 +63,20 @@ export const useProject = create<ProjectState>((set, get) => {
   const update = (fn: (p: Project) => Project) => set((s) => ({ project: fn(s.project), result: null }));
 
   const remember = () => {
-    const { tile, layout, edits } = get().project;
-    set((s) => ({ history: pushHistory(s.history, { tile, layout, edits }) }));
+    const { floors, edits } = get().project;
+    set((s) => ({ history: pushHistory(s.history, { floors, edits }) }));
   };
+
+  /** Aplica uma mudança de piso; se ela descartar ajustes manuais, o passo anterior vai para o histórico. */
+  const updateFloors = (fn: (p: Project) => Project) => {
+    const before = get().project;
+    const after = fn(before);
+    if (after.edits !== before.edits && JSON.stringify(after.edits) !== JSON.stringify(before.edits)) remember();
+    update(() => after);
+  };
+
+  /** Planta nova: os começos e entradas da anterior não fazem sentido aqui. */
+  const freshStarts = (floors: Floor[]): Floor[] => floors.map((f) => ({ ...f, layout: { ...f.layout, origin: 'auto', start: undefined } }));
 
   const showImage = (blob: Blob | null) => {
     const prev = get().planUrl;
@@ -82,7 +101,7 @@ export const useProject = create<ProjectState>((set, get) => {
       if (old) void deleteImage(old.imageId);
       showImage(blob);
       // planta nova: o ponto de partida da anterior não faz sentido aqui
-      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto', start: undefined } }));
+      update((p) => ({ ...p, plan: { ...meta, imageId }, scale: null, rooms: [], edits: NO_EDITS, floors: freshStarts(p.floors) }));
       set({ selectedRoomId: null, history: [] });
     },
 
@@ -91,7 +110,7 @@ export const useProject = create<ProjectState>((set, get) => {
       if (old?.imageId) void deleteImage(old.imageId);
       showImage(null);
       const { plan, scale } = drawnPlan();
-      update((p) => ({ ...p, plan, scale, rooms: [], edits: NO_EDITS, layout: { ...p.layout, origin: 'auto', start: undefined } }));
+      update((p) => ({ ...p, plan, scale, rooms: [], edits: NO_EDITS, floors: freshStarts(p.floors) }));
       set({ selectedRoomId: null, history: [], step: 2 });
     },
 
@@ -134,14 +153,30 @@ export const useProject = create<ProjectState>((set, get) => {
       if (get().selectedRoomId === id) set({ selectedRoomId: null });
     },
 
-    setTile(patch) {
-      update((p) => ({ ...p, tile: { ...p.tile, ...patch }, edits: NO_EDITS }));
+    setTile(floorId, patch) {
+      updateFloors((p) => withFloorTile(p, floorId, patch));
     },
 
-    setLayout(patch) {
-      const resets = layoutChangeResetsEdits(patch);
-      if (resets) remember();
-      update((p) => ({ ...p, layout: { ...p.layout, ...patch }, edits: resets ? NO_EDITS : p.edits }));
+    setLayout(floorId, patch) {
+      updateFloors((p) => withFloorLayout(p, floorId, patch));
+    },
+
+    addFloor(copyFrom) {
+      const id = `piso-${crypto.randomUUID().slice(0, 8)}`;
+      update((p) => withNewFloor(p, copyFrom, id));
+      return id;
+    },
+
+    removeFloor(id) {
+      updateFloors((p) => withoutFloor(p, id));
+    },
+
+    renameFloor(id, name) {
+      update((p) => ({ ...p, floors: p.floors.map((f) => (f.id === id ? { ...f, name } : f)) }));
+    },
+
+    setRoomFloor(roomId, floorId) {
+      updateFloors((p) => withRoomFloor(p, roomId, floorId));
     },
 
     setEdits(edits) {

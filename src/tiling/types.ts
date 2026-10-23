@@ -43,6 +43,14 @@ export interface RoomCm {
   start?: Point;
 }
 
+/** Um piso pronto para o cálculo: a peça, o layout e os cômodos (em cm) que o recebem. */
+export interface FloorInput {
+  id: string;
+  tile: TileSpec;
+  layout: LayoutSpec;
+  rooms: RoomCm[];
+}
+
 export type PieceKind = 'full' | 'cut' | 'sliver';
 export type CutType = 'straight' | 'corner' | 'shaped';
 

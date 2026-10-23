@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { FIRST_FLOOR_ID, floorById, floorName, newFloor, roomFloorId } from './floors';
+import {
+  FIRST_FLOOR_ID,
+  floorById,
+  floorName,
+  floorRoomIds,
+  newFloor,
+  roomFloorId,
+  withFloorLayout,
+  withFloorTile,
+  withNewFloor,
+  withoutFloor,
+  withRoomFloor,
+} from './floors';
 import { rectRing } from './tiling/testUtils';
 import { DEFAULT_LAYOUT, DEFAULT_TILE, NO_EDITS, type TileSpec } from './tiling/types';
 import { emptyProject, normalizeProject, type Project, type Room } from './types';
@@ -78,3 +90,68 @@ describe('piso de cada cômodo', () => {
     expect(floorById(p, 'nao-existe').id).toBe('piso-1');
   });
 });
+
+describe('mudanças por piso', () => {
+  // cômodo a no piso 1, cômodo b no piso 2, com ajustes manuais nos dois
+  const base = (): Project => ({
+    ...emptyProject(),
+    rooms: [room('a'), room('b', { floorId: 'piso-2' })],
+    floors: [newFloor('piso-1', { ...DEFAULT_TILE, jointMm: 3, piecesPerBox: 5 }), newFloor('piso-2', tile(85, 85))],
+    edits: { rowShift: { 'a:0': 4, 'b:1': 7 }, rowOrder: {}, removed: ['a:0:0', 'b:1:2'], hidden: [] },
+  });
+
+  it('floorRoomIds lista os cômodos de cada piso', () => {
+    expect([...floorRoomIds(base(), 'piso-1')]).toEqual(['a']);
+    expect([...floorRoomIds(base(), 'piso-2')]).toEqual(['b']);
+  });
+
+  it('mudar a peça de um piso desfaz só os ajustes dos cômodos dele', () => {
+    const p = withFloorTile(base(), 'piso-2', { lengthCm: 90 });
+    expect(p.floors[1].tile.lengthCm).toBe(90);
+    expect(p.edits.rowShift).toEqual({ 'a:0': 4 });
+    expect(p.edits.removed).toEqual(['a:0:0']);
+  });
+
+  it('o nome automático acompanha a peça; o nome dado pela pessoa fica', () => {
+    expect(withFloorTile(base(), 'piso-2', { lengthCm: 90, widthCm: 90 }).floors[1].name).toBe('Piso 90 × 90 cm');
+    const renomeado = base();
+    renomeado.floors[1].name = 'Porcelanato da cozinha';
+    expect(withFloorTile(renomeado, 'piso-2', { lengthCm: 90 }).floors[1].name).toBe('Porcelanato da cozinha');
+  });
+
+  it('mudar o encaixe de um piso desfaz só os ajustes dele; mudar a compra não desfaz', () => {
+    const grade = withFloorLayout(base(), 'piso-1', { pattern: 'running' });
+    expect(grade.floors[0].layout.pattern).toBe('running');
+    expect(grade.edits.rowShift).toEqual({ 'b:1': 7 });
+    const filete = withFloorLayout(base(), 'piso-1', { minCutCm: 3 });
+    expect(filete.edits).toEqual(base().edits);
+  });
+
+  it('piso novo copia rejunte e compra do piso atual, com peça de 60 × 60 e sem cômodos', () => {
+    const p = withNewFloor(base(), 'piso-1', 'novo');
+    const f = p.floors.find((x) => x.id === 'novo')!;
+    expect(f.tile).toEqual({ ...DEFAULT_TILE, jointMm: 3, piecesPerBox: 5 });
+    expect(f.layout).toEqual(DEFAULT_LAYOUT);
+    expect(floorRoomIds(p, 'novo').size).toBe(0);
+  });
+
+  it('o primeiro piso não pode ser apagado; apagar outro devolve os cômodos ao primeiro', () => {
+    expect(withoutFloor(base(), 'piso-1').floors).toHaveLength(2);
+    const p = withoutFloor(base(), 'piso-2');
+    expect(p.floors).toHaveLength(1);
+    expect(p.rooms.find((r) => r.id === 'b')!.floorId).toBeUndefined();
+    expect(roomFloorId(p, p.rooms.find((r) => r.id === 'b')!)).toBe('piso-1');
+  });
+
+  it('cômodo sem piso deixa de receber piso; trocar de piso desfaz os ajustes dele', () => {
+    const sem = withRoomFloor(base(), 'b', null);
+    expect(sem.rooms.find((r) => r.id === 'b')!.receivesTile).toBe(false);
+    const troca = withRoomFloor(base(), 'b', 'piso-1');
+    const b = troca.rooms.find((r) => r.id === 'b')!;
+    expect(b.receivesTile).toBe(true);
+    expect(b.floorId).toBe('piso-1');
+    expect(troca.edits.rowShift).toEqual({ 'a:0': 4 });
+    expect(troca.edits.removed).toEqual(['a:0:0']);
+  });
+});
+

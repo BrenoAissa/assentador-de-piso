@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { rectRing } from '../tiling/testUtils';
-import { emptyProject, type Room } from '../types';
-import { canAdvance, computeIssues, roomsInCm } from './issues';
+import { newFloor } from '../floors';
+import { DEFAULT_TILE } from '../tiling/types';
+import { validateTile } from '../tiling/validate';
+import { emptyProject, type Project, type Room } from '../types';
+import { canAdvance, computeIssues, floorInputs, roomsInCm } from './issues';
 
 function room(patch: Partial<Room> = {}): Room {
   return { id: 'r1', name: 'Sala', polygonPx: rectRing(0, 0, 600, 400), receivesTile: true, issues: [], ...patch };
@@ -91,3 +94,40 @@ describe('canAdvance', () => {
     expect(canAdvance(p, 2)).toEqual({ ok: true });
   });
 });
+
+describe('pisos no cálculo', () => {
+  const twoFloors = (): Project => ({
+    ...emptyProject(),
+    scale: { pxPerCm: 1, source: 'manual', confidence: 1 },
+    rooms: [room({ id: 'a' }), room({ id: 'b', floorId: 'piso-2' })],
+    floors: [newFloor('piso-1'), newFloor('piso-2', { ...DEFAULT_TILE, lengthCm: 85, widthCm: 85 }), newFloor('piso-3')],
+  });
+
+  it('floorInputs agrupa os cômodos por piso e deixa de fora piso sem cômodos', () => {
+    const inputs = floorInputs(twoFloors());
+    expect(inputs.map((f) => f.id)).toEqual(['piso-1', 'piso-2']);
+    expect(inputs[0].rooms.map((r) => r.id)).toEqual(['a']);
+    expect(inputs[1].rooms.map((r) => r.id)).toEqual(['b']);
+    expect(inputs[1].tile.lengthCm).toBe(85);
+  });
+
+  it('cômodo que não recebe piso não entra em nenhum piso', () => {
+    const p = twoFloors();
+    p.rooms[1] = { ...p.rooms[1], receivesTile: false };
+    expect(floorInputs(p).map((f) => f.id)).toEqual(['piso-1']);
+  });
+
+  it('com dois pisos, o erro de medida diz de qual piso é', () => {
+    const p = twoFloors();
+    p.floors[1].tile.lengthCm = 0;
+    const erro = validateTile(p.floors[1].tile, p.floors[1].layout)[0];
+    expect(canAdvance(p, 3)).toEqual({ ok: false, reason: `${p.floors[1].name}: ${erro}` });
+  });
+
+  it('com um piso só, o erro de medida é o de sempre', () => {
+    const p = emptyProject();
+    p.floors[0].tile.lengthCm = 0;
+    expect(canAdvance(p, 3)).toEqual({ ok: false, reason: validateTile(p.floors[0].tile, p.floors[0].layout)[0] });
+  });
+});
+

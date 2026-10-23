@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NO_EDITS } from '../tiling/types';
-import { HISTORY_LIMIT, hasEdits, layoutChangeResetsEdits, pushHistory, toggleKey } from './edits';
+import { dropRoomEdits, HISTORY_LIMIT, hasEdits, layoutChangeResetsEdits, pushHistory, toggleKey } from './edits';
 
 describe('regras dos ajustes manuais', () => {
   it('hasEdits', () => {
@@ -29,3 +29,16 @@ describe('regras dos ajustes manuais', () => {
     expect(toggleKey(['a', 'b'], 'a')).toEqual(['b']);
   });
 });
+
+describe('dropRoomEdits', () => {
+  it('tira os ajustes dos cômodos dados e mantém os dos outros', () => {
+    const edits = { rowShift: { 'a:0': 3, 'b:2': 1 }, rowOrder: { 'a:1': [1, 0] }, removed: ['a:0:1', 'b:2:0'], hidden: ['a:3:3'] };
+    expect(dropRoomEdits(edits, new Set(['a']))).toEqual({ rowShift: { 'b:2': 1 }, rowOrder: {}, removed: ['b:2:0'], hidden: [] });
+  });
+
+  it('não confunde cômodos cujo id começa igual', () => {
+    const edits = { ...NO_EDITS, removed: ['ab:0:0', 'a:0:0'] };
+    expect(dropRoomEdits(edits, new Set(['a'])).removed).toEqual(['ab:0:0']);
+  });
+});
+

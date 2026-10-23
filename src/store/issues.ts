@@ -1,5 +1,6 @@
 import { isSimple, scaleRing } from '../geometry/polygon';
-import type { RoomCm } from '../tiling/types';
+import { roomFloorId } from '../floors';
+import type { FloorInput, RoomCm } from '../tiling/types';
 import { validateTile } from '../tiling/validate';
 import type { Project, Room, RoomIssue } from '../types';
 
@@ -36,6 +37,15 @@ export function roomsInCm(project: Project): RoomCm[] {
     }));
 }
 
+/** Pisos com os seus cômodos, prontos para o cálculo; piso sem cômodos fica de fora. */
+export function floorInputs(project: Project): FloorInput[] {
+  const cm = roomsInCm(project);
+  const floorOf = new Map(project.rooms.map((r) => [r.id, roomFloorId(project, r)]));
+  return project.floors
+    .map((f) => ({ id: f.id, tile: f.tile, layout: f.layout, rooms: cm.filter((r) => floorOf.get(r.id) === f.id) }))
+    .filter((f) => f.rooms.length > 0);
+}
+
 export type Step = 1 | 2 | 3 | 4;
 
 export function canAdvance(project: Project, step: Step): { ok: boolean; reason?: string } {
@@ -47,8 +57,10 @@ export function canAdvance(project: Project, step: Step): { ok: boolean; reason?
     }
   }
   if (step === 3) {
-    const errors = validateTile(project.floors[0].tile, project.floors[0].layout);
-    if (errors.length > 0) return { ok: false, reason: errors[0] };
+    for (const f of project.floors) {
+      const errors = validateTile(f.tile, f.layout);
+      if (errors.length > 0) return { ok: false, reason: project.floors.length > 1 ? `${f.name}: ${errors[0]}` : errors[0] };
+    }
   }
   return { ok: true };
 }

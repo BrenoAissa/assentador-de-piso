@@ -1,5 +1,5 @@
 import type { PatternOption } from './compare';
-import type { LayoutResult, LayoutSpec, ManualEdits, RoomCm, TileSpec } from './types';
+import type { FloorInput, LayoutSpec, ManualEdits, ProjectLayout, RoomCm, TileSpec } from './types';
 import type { TilingRequest } from './worker';
 
 let worker: Worker | null = null;
@@ -25,16 +25,18 @@ function getWorker(): Worker {
   return worker;
 }
 
-function call<T>(type: TilingRequest['type'], rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits?: ManualEdits): Promise<T> {
+type Request = TilingRequest extends infer R ? (R extends TilingRequest ? Omit<R, 'id'> : never) : never;
+
+function call<T>(req: Request): Promise<T> {
   const id = nextId++;
   return new Promise<T>((resolve, reject) => {
     pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-    getWorker().postMessage({ id, type, rooms, tile, layout, edits } satisfies TilingRequest);
+    getWorker().postMessage({ ...req, id } as TilingRequest);
   });
 }
 
-export const solveInWorker = (rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec, edits?: ManualEdits) =>
-  call<LayoutResult>('solve', rooms, tile, layout, edits);
+/** Calcula todos os pisos (cada um com os seus cômodos) no worker. */
+export const solveInWorker = (floors: FloorInput[], edits?: ManualEdits) => call<ProjectLayout>({ type: 'solve', floors, edits });
 
 export const compareInWorker = (rooms: RoomCm[], tile: TileSpec, layout: LayoutSpec) =>
-  call<PatternOption[]>('compare', rooms, tile, layout);
+  call<PatternOption[]>({ type: 'compare', rooms, tile, layout });

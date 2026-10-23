@@ -77,6 +77,8 @@ export interface Piece {
   removed?: boolean;
   /** Marcada pelo usuário como embaixo de móvel: filete não conta como à vista. */
   hidden?: boolean;
+  /** Piso da peça (no resultado com todos os pisos). */
+  floorId?: string;
 }
 
 /** Ajustes manuais sobre a grade atual (somem quando a grade muda). */
@@ -118,6 +120,14 @@ export interface LayoutResult {
   summary: LayoutSummary;
   originUsed: Point;
   roomOrigins: Record<string, Point>;
+  warnings: string[];
+}
+
+/** Resultado com todos os pisos: as peças juntas (numeração contínua) e o resultado de cada piso. */
+export interface ProjectLayout {
+  pieces: Piece[];
+  /** Na ordem dos pisos do projeto, só os que têm cômodos. */
+  floors: { floorId: string; result: LayoutResult }[];
   warnings: string[];
 }
 

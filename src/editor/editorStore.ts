@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Tool = 'select' | 'draw' | 'rect' | 'calibrate';
+export type Tool = 'select' | 'draw' | 'rect' | 'split' | 'calibrate';
 
 interface EditorState {
   tool: Tool;

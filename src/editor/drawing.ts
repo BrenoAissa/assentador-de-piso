@@ -122,7 +122,8 @@ export interface GeoSnap {
   guides: Guide[];
 }
 
-function nearestOnEdges(p: Point, rings: Ring[]): { point: Point; dist: number } | null {
+/** Ponto mais próximo de `p` nas bordas dos anéis, com a distância. */
+export function nearestOnEdges(p: Point, rings: Ring[]): { point: Point; dist: number } | null {
   let best: { point: Point; dist: number } | null = null;
   for (const ring of rings) {
     for (let i = 0, n = ring.length; i < n; i++) {

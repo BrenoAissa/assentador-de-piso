@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { withFloorLayout, withFloorTile, withNewFloor, withoutFloor, withRoomFloor } from '../floors';
+import { withFloorLayout, withFloorTile, withNewFloor, withoutFloor, withRoomFloor, withSplitRoom } from '../floors';
+import type { Ring } from '../geometry/types';
 import { deleteImage, loadImage, loadProject, saveImage, saveProject } from '../persistence/db';
 import { NO_EDITS, type LayoutResult, type ManualEdits } from '../tiling/types';
 import { drawnPlan, emptyProject, type Floor, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
@@ -43,6 +44,8 @@ interface ProjectState {
   renameFloor(id: string, name: string): void;
   /** Escolhe o piso do cômodo (null = sem piso). */
   setRoomFloor(roomId: string, floorId: string | null): void;
+  /** Divide o cômodo em dois na divisa; devolve o id do cômodo novo. */
+  splitRoom(roomId: string, parts: [Ring, Ring]): string;
   /** Troca os ajustes manuais, guardando o passo anterior no histórico. */
   setEdits(edits: ManualEdits): void;
   undo(): void;
@@ -177,6 +180,16 @@ export const useProject = create<ProjectState>((set, get) => {
 
     setRoomFloor(roomId, floorId) {
       updateFloors((p) => withRoomFloor(p, roomId, floorId));
+    },
+
+    splitRoom(roomId, parts) {
+      const id = crypto.randomUUID();
+      update((p) => {
+        const next = withSplitRoom(p, roomId, parts, id);
+        return { ...next, rooms: next.rooms.map(withIssues) };
+      });
+      set({ selectedRoomId: roomId });
+      return id;
     },
 
     setEdits(edits) {

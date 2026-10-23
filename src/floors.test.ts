@@ -11,7 +11,9 @@ import {
   withNewFloor,
   withoutFloor,
   withRoomFloor,
+  withSplitRoom,
 } from './floors';
+import type { Ring } from './geometry/types';
 import { rectRing } from './tiling/testUtils';
 import { DEFAULT_LAYOUT, DEFAULT_TILE, NO_EDITS, type TileSpec } from './tiling/types';
 import { emptyProject, normalizeProject, type Project, type Room } from './types';
@@ -152,6 +154,35 @@ describe('mudanças por piso', () => {
     expect(b.floorId).toBe('piso-1');
     expect(troca.edits.rowShift).toEqual({ 'a:0': 4 });
     expect(troca.edits.removed).toEqual(['a:0:0']);
+  });
+});
+
+describe('dividir cômodo', () => {
+  it('vira dois cômodos com o nome numerado, no mesmo piso, sem ajustes, começo nem entrada', () => {
+    const p: Project = {
+      ...emptyProject(),
+      rooms: [room('sala', { name: 'Sala', floorId: 'piso-2', start: { x: 10, y: 10 }, origin: { x: 1, y: 1 } }), room('quarto')],
+      floors: [newFloor('piso-1'), newFloor('piso-2', tile(85, 85))],
+      edits: { ...NO_EDITS, removed: ['sala:0:0', 'quarto:1:1'] },
+    };
+    const parts: [Ring, Ring] = [rectRing(0, 0, 200, 300), rectRing(200, 0, 100, 300)];
+    const next = withSplitRoom(p, 'sala', parts, 'novo');
+    const a = next.rooms.find((r) => r.id === 'sala')!;
+    const b = next.rooms.find((r) => r.id === 'novo')!;
+    expect(a.name).toBe('Sala 1');
+    expect(b.name).toBe('Sala 2');
+    expect(a.polygonPx).toEqual(parts[0]);
+    expect(b.polygonPx).toEqual(parts[1]);
+    expect(roomFloorId(next, b)).toBe('piso-2');
+    expect(a.start).toBeUndefined();
+    expect(a.origin).toBeUndefined();
+    expect(next.edits.removed).toEqual(['quarto:1:1']);
+  });
+
+  it('cômodo sem nome usa "Cômodo N" como base', () => {
+    const p: Project = { ...emptyProject(), rooms: [room('x', { name: '' })] };
+    const next = withSplitRoom(p, 'x', [rectRing(0, 0, 1, 1), rectRing(1, 0, 1, 1)], 'y');
+    expect(next.rooms.map((r) => r.name)).toEqual(['Cômodo 1 1', 'Cômodo 1 2']);
   });
 });
 

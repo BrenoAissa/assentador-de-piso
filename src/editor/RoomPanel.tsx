@@ -1,4 +1,6 @@
+import { roomFloorId } from '../floors';
 import { canAdvance, ISSUE_TEXT } from '../store/issues';
+import { fmt } from '../ui/format';
 import { useProject } from '../store/project';
 import { isDrawn } from '../types';
 import { useEditor } from './editorStore';
@@ -17,7 +19,8 @@ interface Props {
 export default function RoomPanel({ detectSlot }: Props) {
   const project = useProject((s) => s.project);
   const selectedRoomId = useProject((s) => s.selectedRoomId);
-  const { selectRoom, updateRoom, removeRoom, setStep } = useProject.getState();
+  const { selectRoom, updateRoom, removeRoom, setStep, setRoomFloor } = useProject.getState();
+  const manyFloors = project.floors.length > 1;
   const setTool = useEditor((s) => s.setTool);
   const { scale, rooms } = project;
   const next = canAdvance(project, 2);
@@ -111,14 +114,27 @@ export default function RoomPanel({ detectSlot }: Props) {
               {scale && room.id === selectedRoomId && (
                 <WallsEditor roomId={room.id} ring={room.polygonPx} pxPerCm={scale.pxPerCm} />
               )}
-              <label className="check" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={room.receivesTile}
-                  onChange={(e) => updateRoom(room.id, { receivesTile: e.target.checked })}
-                />
-                Recebe este piso
-              </label>
+              {manyFloors ? (
+                <div className="segmented room-floor" role="group" aria-label="Piso do cômodo" onClick={(e) => e.stopPropagation()}>
+                  {project.floors.map((f) => (
+                    <button key={f.id} aria-pressed={roomFloorId(project, room) === f.id} title={f.name} onClick={() => setRoomFloor(room.id, f.id)}>
+                      {fmt(f.tile.lengthCm)} × {fmt(f.tile.widthCm)}
+                    </button>
+                  ))}
+                  <button aria-pressed={!room.receivesTile} onClick={() => setRoomFloor(room.id, null)}>
+                    Sem piso
+                  </button>
+                </div>
+              ) : (
+                <label className="check" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={room.receivesTile}
+                    onChange={(e) => updateRoom(room.id, { receivesTile: e.target.checked })}
+                  />
+                  Recebe este piso
+                </label>
+              )}
               {room.issues.map((issue) => (
                 <span key={issue} className="issue">
                   {ISSUE_TEXT[issue]}

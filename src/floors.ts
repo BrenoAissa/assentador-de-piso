@@ -1,5 +1,6 @@
 import { dropRoomEdits, layoutChangeResetsEdits } from './store/edits';
 import { DEFAULT_LAYOUT, DEFAULT_TILE, type LayoutSpec, type TileSpec } from './tiling/types';
+import type { Ring } from './geometry/types';
 import type { Floor, Project, Room } from './types';
 import { fmt } from './ui/format';
 
@@ -86,5 +87,23 @@ export function withRoomFloor(p: Project, roomId: string, floorId: string | null
     rooms: p.rooms.map((r) => (r.id !== roomId ? r : floorId === null ? { ...r, receivesTile: false } : { ...r, receivesTile: true, floorId })),
     edits: dropRoomEdits(p.edits, new Set([roomId])),
   };
+}
+
+/**
+ * Divide um cômodo em dois na divisa: o original fica com `parts[0]` e "{nome} 1", o novo com
+ * `parts[1]` e "{nome} 2", no mesmo piso. Os dois perdem ajustes manuais, começo e entrada.
+ */
+export function withSplitRoom(p: Project, roomId: string, parts: [Ring, Ring], newId: string): Project {
+  const i = p.rooms.findIndex((r) => r.id === roomId);
+  if (i < 0) return p;
+  const { origin, start, ...room } = p.rooms[i];
+  void origin;
+  void start;
+  const base = room.name.trim() || `Cômodo ${i + 1}`;
+  const first: Room = { ...room, name: `${base} 1`, polygonPx: parts[0] };
+  const second: Room = { ...room, id: newId, name: `${base} 2`, polygonPx: parts[1] };
+  const rooms = [...p.rooms];
+  rooms.splice(i, 1, first, second);
+  return { ...p, rooms, edits: dropRoomEdits(p.edits, new Set([roomId])) };
 }
 

@@ -5,7 +5,10 @@ import { useProject } from '../store/project';
 import { isDrawn } from '../types';
 import { fmt } from '../ui/format';
 import { usePanZoom, type View } from '../ui/usePanZoom';
-import { placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGeometry, snapToGrid, translateRing, type GeoSnap } from './drawing';
+import { nearestOnEdges, placeBeside, pointAtDistance, rectRing, snapAngle, snapMove, snapToGeometry, snapToGrid, translateRing, type GeoSnap } from './drawing';
+import { splitRing } from './split';
+import type { Room } from '../types';
+import { pointInPolygon } from '../geometry/polygon';
 import { useEditor, type Tool } from './editorStore';
 import { calibrationScale, insertVertex, nearestEdge, removeVertex, roomSizeLabel } from './ops';
 import { FitButton, MagnetButton } from '../ui/CanvasButtons';
@@ -28,9 +31,10 @@ const GRID_CM = 5;
 
 /** `short`: nome no celular, onde a barra precisa caber na largura da tela. */
 const TOOL_LIST: { id: Tool; label: string; short: string; key: string }[] = [
-  { id: 'select', label: 'Selecionar', short: 'Selecionar', key: 'V' },
+  { id: 'select', label: 'Selecionar', short: 'Editar', key: 'V' },
   { id: 'draw', label: 'Desenhar paredes', short: 'Paredes', key: 'N' },
   { id: 'rect', label: 'Cômodo retangular', short: 'Retângulo', key: 'R' },
+  { id: 'split', label: 'Dividir cômodo', short: 'Dividir', key: 'D' },
   { id: 'calibrate', label: 'Calibrar', short: 'Calibrar', key: 'C' },
 ];
 
@@ -39,6 +43,7 @@ const HINTS: Record<Tool, string> = {
     'Clique num cômodo para selecionar e arraste para mudar de lugar (ele encaixa nas paredes vizinhas). Arraste os pontos para ajustar (Shift: livre, sem ímã), duplo clique na borda cria um ponto e Delete apaga o ponto selecionado.',
   draw: 'Clique onde a parede começa. Digite o comprimento em cm e use as setas (na tela ou no teclado), ou aponte com o mouse e aperte Enter. Ângulo reto e encaixes são automáticos; segure Shift para desenhar livre. Feche no primeiro ponto ou em Fechar cômodo.',
   rect: 'Informe a largura e o comprimento: o cômodo aparece ao lado dos outros. Depois arraste para encaixar.',
+  split: 'Clique na borda do cômodo onde a divisa começa e depois do outro lado. A linha fica reta, perpendicular às paredes (Shift: livre). Arraste para mover a planta.',
   calibrate: 'Clique nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
 };
 
@@ -46,6 +51,7 @@ const HINTS: Record<Tool, string> = {
 const TOUCH_HINTS: Partial<Record<Tool, string>> = {
   select:
     'Toque num cômodo para selecionar. Com ele selecionado, arraste para mudar de lugar ou arraste os pontos para ajustar. Arraste o fundo para mover a vista e use dois dedos para aproximar.',
+  split: 'Toque na borda do cômodo onde a divisa começa e depois do outro lado: a linha fica reta, perpendicular às paredes. Arraste com um dedo para mover a planta.',
   draw: 'Toque para pôr um ponto; arraste com um dedo para mover a planta e use dois dedos para aproximar. Ou toque no campo, digite a medida e use as setas. Feche no primeiro ponto ou em Fechar cômodo.',
   calibrate: 'Toque nas duas pontas de uma medida conhecida (por exemplo, uma parede cotada) e informe a distância real.',
 };
@@ -102,6 +108,11 @@ export default function PlanEditor() {
   const [selVertex, setSelVertex] = useState<{ roomId: string; index: number } | null>(null);
   const [drawPts, setDrawPts] = useState<Point[]>([]);
   const [typed, setTyped] = useState('');
+  /** Divisão em andamento: o cômodo e o primeiro ponto (na borda dele). */
+  const [splitStart, setSplitStart] = useState<{ roomId: string; at: Point } | null>(null);
+  /** Última divisão, para "Desfazer a divisão". */
+  const [lastSplit, setLastSplit] = useState<{ original: Room; newId: string } | null>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
   /** Nome do cômodo que está sendo desenhado parede por parede (opcional). */
   const [drawName, setDrawName] = useState('');
   const [calib, setCalib] = useState<Point[]>([]);
@@ -121,6 +132,8 @@ export default function PlanEditor() {
     setDrawPts([]);
     setTyped('');
     setDrawName('');
+    setSplitStart(null);
+    setSplitError(null);
     setCalib([]);
     setCalibCm('');
     setSelVertex(null);
@@ -233,6 +246,45 @@ export default function PlanEditor() {
     reveal(at);
   };
 
+  /** Cômodo sob o ponto, ou o de borda mais próxima (toque um pouco fora da parede). */
+  const roomNear = (p: Point): Room | undefined =>
+    project.rooms.find((r) => pointInPolygon(p, r.polygonPx)) ??
+    project.rooms
+      .map((r) => ({ r, d: nearestOnEdges(p, [r.polygonPx])?.dist ?? Infinity }))
+      .filter((x) => x.d <= tolW * 2)
+      .sort((a, b) => a.d - b.d)[0]?.r;
+
+  /** Primeiro toque: escolhe o cômodo e prende o ponto na borda; segundo: dá a direção e divide. */
+  const placeSplitPoint = (p: Point, free: boolean) => {
+    setSplitError(null);
+    if (!splitStart) {
+      const room = roomNear(p);
+      if (!room) return setSplitError('Toque na borda do cômodo que você quer dividir.');
+      const snapped = snapToGeometry(p, [room.polygonPx], [], tolW);
+      const at = snapped.kind === 'vertex' || snapped.kind === 'edge' ? snapped.point : (nearestOnEdges(p, [room.polygonPx])?.point ?? p);
+      selectRoom(room.id);
+      setSplitStart({ roomId: room.id, at: drawn ? snapToGrid(at, 1) : at });
+      return;
+    }
+    const room = project.rooms.find((r) => r.id === splitStart.roomId);
+    const b = snapAngle(splitStart.at, p, !free);
+    const parts = room ? splitRing(room.polygonPx, splitStart.at, b) : null;
+    setSplitStart(null);
+    setHover(null);
+    if (!room || !parts) return setSplitError('A linha precisa atravessar o cômodo de uma borda à outra, dividindo em dois.');
+    const newId = useProject.getState().splitRoom(room.id, parts);
+    setLastSplit({ original: room, newId });
+    setTool('select');
+  };
+
+  const undoSplit = () => {
+    if (!lastSplit) return;
+    const { original, newId } = lastSplit;
+    useProject.getState().removeRoom(newId);
+    updateRoom(original.id, { polygonPx: original.polygonPx, name: original.name, origin: original.origin, start: original.start });
+    setLastSplit(null);
+  };
+
   const undoPoint = () => {
     setDrawPts(drawPts.slice(0, -1));
     setTyped('');
@@ -282,7 +334,7 @@ export default function PlanEditor() {
     if (e.button === 1 || e.button === 2) return startPan();
 
     // desenho e calibragem: o ponto só nasce ao soltar sem arrastar (onPointerUp); arrastar move a vista
-    if (tool === 'draw' || tool === 'calibrate') {
+    if (tool === 'draw' || tool === 'calibrate' || tool === 'split') {
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ kind: 'pan', start: { x: e.clientX, y: e.clientY }, view, tap: true });
       return;
@@ -356,6 +408,8 @@ export default function PlanEditor() {
       const sp = drawPoint(p, isFree(e));
       setHover(sp.point);
       setSnapInfo({ kind: sp.kind, guides: sp.guides });
+    } else if (tool === 'split' && splitStart) {
+      setHover(snapAngle(splitStart.at, p, !isFree(e)));
     } else if (tool !== 'select') setHover(p);
   };
 
@@ -370,6 +424,7 @@ export default function PlanEditor() {
     if (drag?.kind === 'pan' && drag.tap && !drag.moved) {
       const p = toWorld(e.clientX, e.clientY);
       if (tool === 'draw') placeDrawPoint(p, isFree(e));
+      else if (tool === 'split') placeSplitPoint(p, isFree(e));
       else if (tool === 'calibrate') setCalib(calib.length >= 2 ? [p] : [...calib, p]);
     }
     setSnapInfo({ kind: null, guides: [] });
@@ -593,6 +648,24 @@ export default function PlanEditor() {
             </g>
           )}
 
+          {tool === 'split' && splitStart && (
+            <g pointerEvents="none">
+              {hover && (
+                <line
+                  x1={splitStart.at.x}
+                  y1={splitStart.at.y}
+                  x2={hover.x}
+                  y2={hover.y}
+                  stroke="#d9493b"
+                  strokeWidth={2.5}
+                  strokeDasharray="8 5"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              <circle cx={splitStart.at.x} cy={splitStart.at.y} r={7 / k} fill="#d9493b" stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            </g>
+          )}
+
           {snapInfo.guides.map((g, i) => (
             <line
               key={`guia${i}`}
@@ -730,6 +803,46 @@ export default function PlanEditor() {
           </button>
         );
       })()}
+
+      {tool === 'split' && (
+        <div className="popover draw-panel">
+          <p>
+            {splitStart ? (
+              <>
+                <strong>Agora o outro lado.</strong> Toque do outro lado do cômodo; a linha fica reta, perpendicular às paredes.
+              </>
+            ) : (
+              <>
+                <strong>Onde a divisa começa?</strong> Toque na borda do cômodo, no ponto onde o piso muda.
+              </>
+            )}
+          </p>
+          {splitError && <p className="error">{splitError}</p>}
+          {splitStart && (
+            <div>
+              <button type="button" className="btn btn-sm" onClick={() => setSplitStart(null)}>
+                Recomeçar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {lastSplit && tool === 'select' && (
+        <div className="popover draw-panel split-done" role="status">
+          <p>
+            <strong>Cômodo dividido.</strong> Escolha o piso de cada parte na lista de cômodos.
+          </p>
+          <div className="draw-actions">
+            <button type="button" className="btn btn-sm" onClick={undoSplit}>
+              Desfazer a divisão
+            </button>
+            <button type="button" className="btn btn-sm btn-quiet" onClick={() => setLastSplit(null)}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
 
       {drawn && !hasRooms && tool === 'select' && (
         <div className="empty-start">

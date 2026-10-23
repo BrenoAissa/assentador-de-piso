@@ -429,6 +429,12 @@ select {
   border-color: var(--grafite-2);
 }
 
+.draw-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .measure-row {
   display: grid;
   grid-template-columns: 1fr 44px;
@@ -1533,6 +1539,10 @@ select {
 
   .tool-icon {
     padding: 8px 9px;
+  }
+
+  .toolbar .tool:not(.tool-icon) {
+    padding: 9px 8px;
   }
 
   /* formulários sobre a planta ocupam a largura da tela */

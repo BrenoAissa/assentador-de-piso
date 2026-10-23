@@ -827,6 +827,61 @@ select {
   color: var(--grafite-2);
 }
 
+/* ---------- vários pisos ---------- */
+
+.floor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--rejunte-claro);
+}
+
+.floor-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.floor-tabs button {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--rejunte);
+  border-radius: 999px;
+  background: var(--prancheta);
+  font-size: 0.86rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.floor-tabs button[aria-selected='true'] {
+  background: var(--grafite);
+  border-color: var(--grafite);
+  color: #fff;
+  font-weight: 600;
+}
+
+.add-floor {
+  margin-left: auto;
+  flex: none;
+}
+
+.floor-rooms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.floor-rooms .check {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 /* ---------- formulários do piso ---------- */
 
 .input-wrap {

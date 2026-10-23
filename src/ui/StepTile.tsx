@@ -1,7 +1,10 @@
+import { useState } from 'react';
+import { floorById, roomFloorId } from '../floors';
 import { hasEdits } from '../store/edits';
 import { canAdvance } from '../store/issues';
 import { useProject } from '../store/project';
 import { validateTile } from '../tiling/validate';
+import type { LayoutSpec, TileSpec } from '../types';
 import { OrientationPicker } from './LayoutPickers';
 import NumField from './NumField';
 import TilePreview from './TilePreview';
@@ -26,10 +29,28 @@ function TileShape({ l, w }: { l: number; w: number }) {
 
 export default function StepTile() {
   const project = useProject((s) => s.project);
-  const { setTile, setLayout, setStep } = useProject.getState();
-  const { tile, layout } = project;
+  const { setStep, addFloor, removeFloor, renameFloor, setRoomFloor } = useProject.getState();
+  const [activeId, setActiveId] = useState(project.floors[0].id);
+  // piso apagado (ou projeto trocado): volta para o primeiro
+  const floor = floorById(project, activeId);
+  const { tile, layout } = floor;
+  const setTile = (patch: Partial<TileSpec>) => useProject.getState().setTile(floor.id, patch);
+  const setLayout = (patch: Partial<LayoutSpec>) => useProject.getState().setLayout(floor.id, patch);
+  const many = project.floors.length > 1;
+  const first = project.floors[0];
   const errors = validateTile(tile, layout);
   const next = canAdvance(project, 3);
+  const otherError = !next.ok && errors.length === 0 ? next.reason : null;
+  const scale = project.scale;
+  const roomLabel = (i: number) => project.rooms[i].name.trim() || `Cômodo ${i + 1}`;
+  const floorRooms = project.rooms.filter((r) => roomFloorId(project, r) === floor.id);
+
+  const newFloor = () => setActiveId(addFloor(floor.id));
+  const deleteFloor = () => {
+    if (!window.confirm(`Apagar o ${floor.name}? Os cômodos dele voltam para o ${first.name}.`)) return;
+    removeFloor(floor.id);
+    setActiveId(first.id);
+  };
   const isPreset = (p: (typeof PRESETS)[number]) => tile.lengthCm === p.l && tile.widthCm === p.w;
 
   return (
@@ -39,6 +60,59 @@ export default function StepTile() {
       </div>
       <aside className="panel" aria-label="Piso">
         <SampleNotice />
+        <div className="floor-bar">
+          {many && (
+            <div className="floor-tabs" role="tablist" aria-label="Pisos">
+              {project.floors.map((f) => (
+                <button key={f.id} role="tab" aria-selected={f.id === floor.id} onClick={() => setActiveId(f.id)}>
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="btn btn-sm btn-quiet add-floor" onClick={newFloor}>
+            + Outro piso
+          </button>
+        </div>
+
+        {many && (
+          <section className="panel-section">
+            <label className="field">
+              <span>Nome do piso</span>
+              <input className="input" value={floor.name} onChange={(e) => renameFloor(floor.id, e.target.value)} />
+            </label>
+            <h3>Cômodos com este piso</h3>
+            {project.rooms.length === 0 || !scale ? (
+              <p className="muted">Nenhum cômodo desenhado ainda.</p>
+            ) : (
+              <ul className="floor-rooms">
+                {project.rooms.map((r, i) => {
+                  const on = roomFloorId(project, r);
+                  const elsewhere = on && on !== floor.id ? floorById(project, on).name : null;
+                  return (
+                    <li key={r.id}>
+                      <label className="check">
+                        <input type="checkbox" checked={on === floor.id} onChange={(e) => setRoomFloor(r.id, e.target.checked ? floor.id : null)} />
+                        {roomLabel(i)}
+                        {elsewhere && <span className="muted">no {elsewhere}</span>}
+                        {!on && <span className="muted">sem piso</span>}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {floorRooms.length === 0 && project.rooms.length > 0 && <p className="muted">Nenhum cômodo com este piso.</p>}
+            {floor.id !== first.id && (
+              <div>
+                <button className="btn btn-sm btn-quiet btn-danger" onClick={deleteFloor}>
+                  Apagar este piso
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         <section className="panel-section">
           <h3>Qual é a peça?</h3>
           <div className="tile-cards">
@@ -114,6 +188,7 @@ export default function StepTile() {
               {e}
             </p>
           ))}
+          {otherError && <p className="error">{otherError}</p>}
           <div className="row">
             <button className="btn" onClick={() => setStep(2)}>
               Voltar aos cômodos

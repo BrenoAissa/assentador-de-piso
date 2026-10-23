@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { roomsInCm } from '../store/issues';
+import { floorInputs } from '../store/issues';
 import { useProject } from '../store/project';
 import { compareInWorker } from '../tiling/client';
 import type { PatternOption } from '../tiling/compare';
 import { fmt, patternLabel } from '../ui/format';
 
-export default function Compare() {
+/** Compara os três encaixes no piso `floorId`. */
+export default function Compare({ floorId }: { floorId: string }) {
   const project = useProject((s) => s.project);
+  const input = floorInputs(project).find((f) => f.id === floorId);
   const setLayout = useProject((s) => s.setLayout);
   const [options, setOptions] = useState<PatternOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,18 +17,20 @@ export default function Compare() {
     let alive = true;
     setOptions(null);
     setError(null);
-    compareInWorker(roomsInCm(project), project.tile, project.layout)
+    if (!input) return;
+    compareInWorker(input.rooms, input.tile, input.layout)
       .then((o) => alive && setOptions(o))
       .catch((e: Error) => alive && setError(e.message));
     return () => {
       alive = false;
     };
-  }, [project]);
+  }, [project, floorId]);
 
+  if (!input) return <p className="muted">Nenhum cômodo com este piso.</p>;
   if (error) return <p className="error">{error}</p>;
   if (!options) return <p className="muted">Calculando os três encaixes…</p>;
 
-  const current = patternLabel(project.layout);
+  const current = patternLabel(input.layout);
   const best = options.reduce((a, b) =>
     b.result.summary.slivers < a.result.summary.slivers ||
     (b.result.summary.slivers === a.result.summary.slivers && b.result.summary.tilesToBuy < a.result.summary.tilesToBuy)
@@ -73,7 +77,7 @@ export default function Compare() {
                 ) : (
                   <button
                     className="btn btn-sm"
-                    onClick={() => setLayout({ pattern: o.layout.pattern, runningOffset: o.layout.runningOffset, origin: 'auto' })}
+                    onClick={() => setLayout(floorId, { pattern: o.layout.pattern, runningOffset: o.layout.runningOffset, origin: 'auto' })}
                   >
                     Usar esta
                   </button>

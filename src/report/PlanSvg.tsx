@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { bbox } from '../geometry/polygon';
 import type { Ring } from '../geometry/types';
-import type { LayoutResult, Piece, RoomCm } from '../tiling/types';
+import type { Piece, RoomCm } from '../tiling/types';
 import { cutLabel } from '../ui/format';
 
 export const PIECE_FILL: Record<Piece['kind'], string> = {
@@ -22,7 +22,7 @@ export function pieceFill(p: Piece): string {
 const pts = (ring: Ring) => ring.map((q) => `${q.x},${q.y}`).join(' ');
 
 interface Props {
-  result: LayoutResult;
+  result: { pieces: Piece[] };
   rooms: RoomCm[];
   /** Tamanho da fonte em cm (unidades do desenho). */
   fontSize: number;

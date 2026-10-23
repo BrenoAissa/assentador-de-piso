@@ -2,7 +2,7 @@ import { bbox, pointInPolygon, swapXY } from '../geometry/polygon';
 import type { Point } from '../geometry/types';
 import { computeLayout } from './engine';
 import { pitch, rowShift } from './grid';
-import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from './types';
+import type { LayoutSpec, Piece, RoomCm, TileSpec } from './types';
 
 /** Distância máxima para "encostar" a primeira fileira na parede clicada. */
 export const START_SNAP_CM = 60;
@@ -95,7 +95,7 @@ export function entrancePoints(layout: LayoutSpec, rooms: RoomCm[]): Point[] {
 }
 
 /** Peça da entrada: a que cobre o ponto tocado ou, se o toque foi na soleira, a mais perto dele. */
-export function entrancePiece(result: LayoutResult, p: Point): Piece | undefined {
+export function entrancePiece(result: { pieces: Piece[] }, p: Point): Piece | undefined {
   const live = result.pieces.filter((q) => !q.removed);
   const inside = live.find((q) => q.shape.some((r) => pointInPolygon(p, r)));
   if (inside) return inside;

@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { BoxGeometry, Color, ExtrudeGeometry, InstancedMesh, Matrix4, ShapeGeometry } from 'three';
 import { bbox } from '../geometry/polygon';
 import { PIECE_FILL, pieceFill } from '../report/PlanSvg';
-import type { LayoutResult, Piece, RoomCm } from '../tiling/types';
+import type { Piece, RoomCm } from '../tiling/types';
 import { ringsToShapes, TILE_H, WALL_H, WALL_T, wallSegments } from './geometry';
 import Hint, { isTouch } from '../ui/Hint';
 
@@ -13,7 +13,7 @@ const SELECTED = '#f2c230';
 const FLAT = -Math.PI / 2;
 
 interface Props {
-  result: LayoutResult;
+  result: { pieces: Piece[] };
   rooms: RoomCm[];
   selected: string | null;
   onSelect(key: string | null): void;

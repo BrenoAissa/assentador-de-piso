@@ -9,14 +9,17 @@ import { HIDDEN_FILL, PIECE_FILL } from '../report/PlanSvg';
 import PrintSheet from '../report/PrintSheet';
 import Summary from '../report/Summary';
 import { toggleKey } from '../store/edits';
-import { roomsInCm } from '../store/issues';
+import { floorsTouch } from '../geometry/touch';
+import { floorInputs } from '../store/issues';
 import { useProject } from '../store/project';
 import { solveInWorker } from '../tiling/client';
 import { moveInOrder, rowIsStrip, rowKey, targetIndex } from '../tiling/edits';
 import { computeLayout } from '../tiling/engine';
+import { floorResult, replaceFloor } from '../tiling/floors';
 import { pitch } from '../tiling/grid';
 import { floorSnap, rowSnap, type RowMatch, type WallGuide } from '../tiling/snap';
-import type { LayoutResult, ManualEdits, Piece } from '../tiling/types';
+import { entrancePiece } from '../tiling/start';
+import type { ManualEdits, Piece, ProjectLayout } from '../tiling/types';
 import { CUT_TYPE_LABEL, cutLabel, fmt } from './format';
 import { OrientationPicker, PatternPicker } from './LayoutPickers';
 import SampleNotice from './SampleNotice';
@@ -54,13 +57,21 @@ export default function StepResult() {
   const canUndo = useProject((s) => s.history.length > 0);
   const planUrl = useProject((s) => s.planUrl);
   const { setResult, setLayout, setEdits, undo, setStep, updateRoom } = useProject.getState();
-  const { tile, layout, edits } = project;
-  const rooms = useMemo(() => roomsInCm(project), [project]);
+  const { edits } = project;
+  /** Pisos com os seus cômodos; cada um é calculado e comprado separado. */
+  const floors = useMemo(() => floorInputs(project), [project]);
+  const rooms = useMemo(() => floors.flatMap((f) => f.rooms), [floors]);
+  const many = floors.length > 1;
+  const floorName = (id: string) => project.floors.find((f) => f.id === id)?.name ?? '';
+  /** Piso em ajuste (encaixe, direção, comparar): o da última peça tocada. */
+  const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
+  const active = floors.find((f) => f.id === activeFloorId) ?? floors[0];
+  const floorOf = (piece?: Piece) => floors.find((f) => f.id === piece?.floorId) ?? active;
   const [tab, setTab] = useState<ResultTab>('montar');
   const [tool, setTool] = useState<MontarTool>('start');
   const [showFurniture, setShowFurniture] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
-  const [preview, setPreview] = useState<LayoutResult | null>(null);
+  const [preview, setPreview] = useState<ProjectLayout | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [topView, setTopView] = useState<string | null>(null);
@@ -71,10 +82,10 @@ export default function StepResult() {
   const frame = useRef(0);
 
   useEffect(() => {
-    if (result || rooms.length === 0) return;
+    if (result || floors.length === 0) return;
     let alive = true;
     setError(null);
-    solveInWorker(rooms, tile, layout, edits)
+    solveInWorker(floors, edits)
       .then((r) => {
         if (alive && useProject.getState().project === project) {
           setResult(r);
@@ -85,7 +96,7 @@ export default function StepResult() {
     return () => {
       alive = false;
     };
-  }, [project, result, rooms, tile, layout, edits, setResult]);
+  }, [project, result, floors, edits, setResult]);
 
   // Ctrl+Z desfaz; Delete apaga a peça selecionada
   useEffect(() => {
@@ -106,29 +117,36 @@ export default function StepResult() {
   const shown = preview ?? result;
   const selPiece = selected ? shown?.pieces.find((p) => p.key === selected) : undefined;
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? '';
-  const global = layout.gridMode === 'global';
-  const vertical = layout.rotationDeg === 90;
+  const select = (key: string | null) => {
+    setSelected(key);
+    const piece = key ? shown?.pieces.find((p) => p.key === key) : undefined;
+    if (piece?.floorId) setActiveFloorId(piece.floorId);
+  };
   const furniture =
     showFurniture && planUrl && project.plan && project.scale
       ? { url: planUrl, w: project.plan.widthPx / project.scale.pxPerCm, h: project.plan.heightPx / project.scale.pxPerCm }
       : null;
 
-  /** Recalcula na hora, no próprio navegador, para o arraste acompanhar o mouse. */
-  const previewWith = (origins: Record<string, Point>, nextEdits: ManualEdits) => {
+  /** Recalcula na hora, no próprio navegador, só o piso arrastado, para o arraste acompanhar o mouse. */
+  const previewWith = (floorId: string, origins: Record<string, Point>, nextEdits: ManualEdits) => {
+    const f = floors.find((x) => x.id === floorId);
+    if (!f || !result) return;
     cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => setPreview(computeLayout(rooms, tile, layout, origins, nextEdits)));
+    frame.current = requestAnimationFrame(() => setPreview(replaceFloor(result, floorId, computeLayout(f.rooms, f.tile, f.layout, origins, nextEdits))));
   };
 
   const roomAt = (p: Point) => rooms.find((r) => pointInPolygon(p, r.ring));
 
   /** Guarda o ponto tocado como entrada; a montagem posiciona a grade para a peça dali ficar inteira. */
   const onStart = (p: Point) => {
-    if (global) {
-      setLayout({ start: p });
-    } else {
-      const room = roomAt(p);
-      if (room) updateRoom(room.id, { start: p });
-    }
+    // a entrada é do piso da peça tocada (ou do cômodo tocado); os outros pisos não mudam
+    const room = roomAt(p);
+    const piece = shown ? entrancePiece(shown, p) : undefined;
+    const f = (room && floors.find((x) => x.rooms.some((r) => r.id === room.id))) ?? floorOf(piece);
+    if (!f) return;
+    if (f.layout.gridMode === 'global') setLayout(f.id, { start: p });
+    else if (room) updateRoom(room.id, { start: p });
+    setActiveFloorId(f.id);
     setSelected(null);
     setNotice(null);
   };
@@ -136,35 +154,40 @@ export default function StepResult() {
   const wallsLabel = (n: number) => (n === 0 ? null : n === 1 ? 'Peças inteiras encostadas nesta parede' : `Peças inteiras encostadas em ${n} paredes`);
 
   const onFloorDrag = (delta: Point, done: boolean, piece: Piece | undefined, tolCm: number) => {
-    if (!result) return;
-    const room = !global && piece ? rooms.find((r) => r.id === piece.roomId) : undefined;
+    // move só a grade do piso tocado
+    const f = floorOf(piece);
+    const fr = result && f ? floorResult(result, f.id) : undefined;
+    if (!f || !fr) return;
+    const global = f.layout.gridMode === 'global';
+    const room = !global && piece ? f.rooms.find((r) => r.id === piece.roomId) : undefined;
     if (!global && !room) return;
-    const base = global ? result.originUsed : result.roomOrigins[room!.id];
-    const snap = floorSnap(global ? rooms : [room!], tile, layout, base, delta, tolCm);
+    const base = global ? fr.originUsed : fr.roomOrigins[room!.id];
+    const snap = floorSnap(global ? f.rooms : [room!], f.tile, f.layout, base, delta, tolCm);
     const o = { x: base.x + snap.delta.x, y: base.y + snap.delta.y };
     if (done) {
       setGuides([]);
       setFloorLabel(null);
       // arrastar o piso escolhe o começo à mão: a marca de entrada sai
-      if (global) setLayout({ origin: o, start: undefined });
+      if (global) setLayout(f.id, { origin: o, start: undefined });
       else updateRoom(room!.id, { origin: o, start: undefined });
       return;
     }
     setGuides(snap.guides);
     setFloorLabel(wallsLabel(snap.guides.length) ?? (tolCm === 0 ? 'Livre, sem ímã' : 'Solte quando as peças encostarem onde você quer'));
-    previewWith(global ? Object.fromEntries(rooms.map((r) => [r.id, o])) : { ...result.roomOrigins, [room!.id]: o }, edits);
+    previewWith(f.id, global ? Object.fromEntries(f.rooms.map((r) => [r.id, o])) : { ...fr.roomOrigins, [room!.id]: o }, edits);
   };
 
   const onRowDrag = (piece: Piece, delta: number, done: boolean, tolCm: number) => {
-    if (!result) return;
-    const room = rooms.find((r) => r.id === piece.roomId);
-    if (!room) return;
+    const f = floorOf(piece);
+    const fr = result && f ? floorResult(result, f.id) : undefined;
+    const room = f?.rooms.find((r) => r.id === piece.roomId);
+    if (!f || !fr || !room) return;
     const key = rowKey(piece.roomId, piece.row);
     // fileiras vizinhas do mesmo cômodo, com o deslize que já tiverem, para alinhar as juntas
     const neighbours = [piece.row - 1, piece.row + 1]
-      .filter((r) => result.pieces.some((p) => p.roomId === room.id && p.row === r))
+      .filter((r) => fr.pieces.some((p) => p.roomId === room.id && p.row === r))
       .map((r) => ({ row: r, extra: edits.rowShift[rowKey(room.id, r)] ?? 0 }));
-    const snap = rowSnap(room, tile, layout, result.roomOrigins[room.id], piece.row, (edits.rowShift[key] ?? 0) + delta, tolCm, neighbours);
+    const snap = rowSnap(room, f.tile, f.layout, fr.roomOrigins[room.id], piece.row, (edits.rowShift[key] ?? 0) + delta, tolCm, neighbours);
     const next: ManualEdits = {
       ...edits,
       rowShift: { ...edits.rowShift, [key]: snap.extra },
@@ -178,12 +201,14 @@ export default function StepResult() {
     }
     setGuides(snap.guides);
     setDragRow({ roomId: piece.roomId, row: piece.row, matches: snap.matches, free: tolCm === 0 });
-    previewWith(result.roomOrigins, next);
+    previewWith(f.id, fr.roomOrigins, next);
   };
 
   /** "Pontas da fileira: inteira e 38 cm" para a fileira sendo arrastada. */
   const rowLabel = (() => {
     if (!dragRow || !shown) return null;
+    const rf = floors.find((f) => f.rooms.some((r) => r.id === dragRow.roomId)) ?? active;
+    const vertical = rf.layout.rotationDeg === 90;
     const along = (p: Piece) => {
       const b = bbox(p.shape);
       return vertical ? { pos: b.y, len: b.h } : { pos: b.x, len: b.w };
@@ -191,7 +216,7 @@ export default function StepResult() {
     const row = shown.pieces.filter((p) => p.roomId === dragRow.roomId && p.row === dragRow.row).sort((a, b) => along(a).pos - along(b).pos);
     if (row.length === 0) return null;
     // a fileira corre no comprimento da peça (a rotação só troca os eixos da planta)
-    const L = tile.lengthCm;
+    const L = rf.tile.lengthCm;
     const end = (p: Piece) => (Math.abs(along(p).len - L) < 0.1 ? 'inteira' : `${fmt(along(p).len)} cm`);
     const text = `Pontas da fileira: ${end(row[0])} e ${end(row[row.length - 1])}`;
     const said: Record<RowMatch, string> = {
@@ -207,13 +232,15 @@ export default function StepResult() {
 
   const onPieceDrop = (piece: Piece, axisPos: number) => {
     if (!shown) return;
+    const pf = floorOf(piece);
+    const vertical = pf.layout.rotationDeg === 90;
     const along = (p: Piece) => {
       const b = bbox(p.shape);
       return vertical ? b.y + b.h / 2 : b.x + b.w / 2;
     };
     const row = shown.pieces.filter((p) => p.roomId === piece.roomId && p.row === piece.row).sort((a, b) => along(a) - along(b));
     const frameRow = vertical ? row.map((p) => ({ ...p, shape: p.shape.map(swapXY) })) : row;
-    if (!rowIsStrip(frameRow, pitch(tile).joint)) {
+    if (!rowIsStrip(frameRow, pitch(pf.tile).joint)) {
       setNotice('Esta fileira passa por um canto ou parede inclinada. Use "Arrastar fileira" para mexer nela.');
       return;
     }
@@ -282,12 +309,11 @@ export default function StepResult() {
             <Plan2D
               result={shown}
               rooms={rooms}
-              tile={tile}
-              layout={layout}
+              floors={floors}
               tool={tool}
               furniture={furniture}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={select}
               onStart={onStart}
               onFloorDrag={onFloorDrag}
               onRowDrag={onRowDrag}
@@ -338,15 +364,15 @@ export default function StepResult() {
             />
           ) : tab === '3d' ? (
             <Suspense fallback={<div className="center-msg">Carregando o 3D…</div>}>
-              <Scene result={shown} rooms={rooms} selected={selected} onSelect={setSelected} />
+              <Scene result={shown} rooms={rooms} selected={selected} onSelect={select} />
             </Suspense>
           ) : tab === 'cuts' ? (
             <div className="scroll-pane">
-              <CutTable result={shown} rooms={rooms} selected={selected} onSelect={setSelected} />
+              <CutTable layout={shown} floorNames={Object.fromEntries(project.floors.map((f) => [f.id, f.name]))} rooms={rooms} selected={selected} onSelect={select} />
             </div>
           ) : (
             <div className="scroll-pane">
-              <Compare />
+              {active && <Compare floorId={active.id} />}
             </div>
           )}
         </div>
@@ -355,7 +381,13 @@ export default function StepResult() {
       <aside className="panel" aria-label="Resultado">
         <SampleNotice />
         <section className="panel-section">
-          {shown ? <Summary summary={shown.summary} tile={tile} /> : <p className="muted">Calculando…</p>}
+          {shown ? (
+            shown.floors.map(({ floorId, result: r }) => (
+              <Summary key={floorId} summary={r.summary} tile={floors.find((f) => f.id === floorId)?.tile ?? active.tile} title={many ? floorName(floorId) : undefined} />
+            ))
+          ) : (
+            <p className="muted">Calculando…</p>
+          )}
           {shown && shown.pieces.length > MANY_PIECES && (
             <p className="error">São mais de {MANY_PIECES.toLocaleString('pt-BR')} peças; o 3D mostra uma versão simplificada.</p>
           )}
@@ -394,14 +426,18 @@ export default function StepResult() {
               Mostrar os móveis da planta
             </label>
           )}
-          {global && (layout.origin !== 'auto' || layout.start) && (
+          {active && active.layout.gridMode === 'global' && (active.layout.origin !== 'auto' || active.layout.start) && (
             <div>
-              <button className="btn btn-sm btn-quiet" onClick={() => setLayout({ origin: 'auto', start: undefined })}>
-                {layout.start ? 'Tirar a entrada e deixar o app escolher (menos filetes)' : 'Deixar o app escolher o começo (menos filetes)'}
+              <button className="btn btn-sm btn-quiet btn-wrap" onClick={() => setLayout(active.id, { origin: 'auto', start: undefined })}>
+                {active.layout.start ? 'Tirar a entrada e deixar o app escolher (menos filetes)' : 'Deixar o app escolher o começo (menos filetes)'}
+                {many && ` no ${floorName(active.id)}`}
               </button>
             </div>
           )}
-          {(layout.start || rooms.some((r) => r.start)) && shown && shown.summary.slivers > 0 && (
+          {many && floorsTouch(floors) && (
+            <p className="muted">Para peça inteira dos dois lados da divisa, marque a entrada encostada nela em cada piso.</p>
+          )}
+          {active && (active.layout.start || active.rooms.some((r) => r.start)) && shown && (floorResult(shown, active.id)?.summary.slivers ?? 0) > 0 && (
             <p className="muted">
               Para a peça da entrada ficar inteira, os filetes foram para as paredes do outro lado. Dá para escondê-los: em
               "Arrastar fileira", leve o filete para baixo de um móvel, ou toque na peça e marque "Fica embaixo de móvel".
@@ -423,7 +459,7 @@ export default function StepResult() {
             <li>
               <i className="dashed" style={{ background: PIECE_FILL.cut }} /> Sai de sobra
             </li>
-            {(layout.start || rooms.some((r) => r.start)) && (
+            {floors.some((f) => f.layout.start || f.rooms.some((r) => r.start)) && (
               <li>
                 <i className="entrance" /> Entrada
               </li>
@@ -465,11 +501,22 @@ export default function StepResult() {
           </section>
         )}
 
-        <section className="panel-section">
-          <PatternPicker layout={layout} onChange={setLayout} />
-          <OrientationPicker tile={tile} layout={layout} onChange={setLayout} />
-          <p className="muted">Trocar o encaixe ou a direção refaz a montagem; dá para voltar com Desfazer.</p>
-        </section>
+        {active && (
+          <section className="panel-section">
+            {many && (
+              <div className="floor-tabs" role="tablist" aria-label="Piso em ajuste">
+                {floors.map((f) => (
+                  <button key={f.id} role="tab" aria-selected={f.id === active.id} onClick={() => setActiveFloorId(f.id)}>
+                    {floorName(f.id)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <PatternPicker layout={active.layout} onChange={(patch) => setLayout(active.id, patch)} />
+            <OrientationPicker tile={active.tile} layout={active.layout} onChange={(patch) => setLayout(active.id, patch)} />
+            <p className="muted">Trocar o encaixe ou a direção refaz a montagem; dá para voltar com Desfazer.</p>
+          </section>
+        )}
 
         <footer className="panel-footer">
           <div className="row">
@@ -483,7 +530,7 @@ export default function StepResult() {
         </footer>
       </aside>
 
-      {result && <PrintSheet result={result} rooms={rooms} tile={tile} layout={layout} topView={topView} />}
+      {result && <PrintSheet result={result} rooms={rooms} floors={floors.map((f) => ({ ...f, name: floorName(f.id) }))} topView={topView} />}
     </div>
   );
 }

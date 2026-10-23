@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { withFloorLayout, withFloorTile, withNewFloor, withoutFloor, withRoomFloor, withSplitRoom } from '../floors';
 import type { Ring } from '../geometry/types';
 import { deleteImage, loadImage, loadProject, saveImage, saveProject } from '../persistence/db';
-import { NO_EDITS, type LayoutResult, type ManualEdits } from '../tiling/types';
+import { NO_EDITS, type ManualEdits, type ProjectLayout } from '../tiling/types';
 import { drawnPlan, emptyProject, type Floor, type LayoutSpec, type PlanImage, type Project, type Room, type Scale, type TileSpec } from '../types';
 import { pushHistory } from './edits';
 import { computeIssues, type Step } from './issues';
@@ -22,7 +22,7 @@ interface ProjectState {
   planBlob: Blob | null;
   selectedRoomId: string | null;
   /** Resultado do passo 4; zerado em qualquer mudança do projeto. */
-  result: LayoutResult | null;
+  result: ProjectLayout | null;
   loaded: boolean;
 
   setPlan(blob: Blob, meta: Omit<PlanImage, 'imageId'>): Promise<void>;
@@ -51,7 +51,7 @@ interface ProjectState {
   undo(): void;
   setStep(s: Step): void;
   selectRoom(id: string | null): void;
-  setResult(r: LayoutResult | null): void;
+  setResult(r: ProjectLayout | null): void;
   loadFromStorage(): Promise<void>;
   replaceProject(p: Project, image: Blob | null): Promise<void>;
 }

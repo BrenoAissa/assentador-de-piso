@@ -6,9 +6,11 @@ interface Props {
   tile: TileSpec;
   /** Mostra os detalhes abertos (impressão). */
   expanded?: boolean;
+  /** Nome do piso, quando o projeto tem mais de um. */
+  title?: string;
 }
 
-export default function Summary({ summary: s, tile, expanded }: Props) {
+export default function Summary({ summary: s, tile, expanded, title }: Props) {
   const details = (
     <dl className="summary">
       <div>
@@ -42,6 +44,7 @@ export default function Summary({ summary: s, tile, expanded }: Props) {
 
   return (
     <div className="summary2">
+      {title && <h3 className="summary-title">{title}</h3>}
       <div className="buy">
         <span className="muted">Comprar</span>
         <strong>

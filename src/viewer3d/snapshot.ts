@@ -15,7 +15,7 @@ import {
 } from 'three';
 import { bbox } from '../geometry/polygon';
 import { pieceFill } from '../report/PlanSvg';
-import type { LayoutResult, RoomCm } from '../tiling/types';
+import type { Piece, RoomCm } from '../tiling/types';
 import { ringsToShapes, TILE_H, WALL_H, WALL_T, wallSegments } from './geometry';
 
 const FOV = 30;
@@ -31,7 +31,7 @@ export function topViewDistance(w: number, h: number, aspect: number, fovDeg: nu
  * Foto do piso em 3D visto de cima, como PNG (data URL), para a folha de impressão.
  * Monta uma cena própria (sem o visualizador interativo), renderiza uma vez e libera a GPU.
  */
-export function renderTopView(result: LayoutResult, rooms: RoomCm[], width = 1800): string {
+export function renderTopView(result: { pieces: Piece[] }, rooms: RoomCm[], width = 1800): string {
   const b = bbox(rooms.map((r) => r.ring));
   const aspect = Math.min(2.5, Math.max(0.5, b.w / Math.max(1, b.h)));
   const height = Math.round(width / aspect);

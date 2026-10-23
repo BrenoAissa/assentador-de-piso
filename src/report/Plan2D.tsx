@@ -6,7 +6,7 @@ import { rowIsStrip, slotStart, targetIndex } from '../tiling/edits';
 import { pitch } from '../tiling/grid';
 import type { WallGuide } from '../tiling/snap';
 import { entrancePiece, entrancePoints } from '../tiling/start';
-import type { LayoutResult, LayoutSpec, Piece, RoomCm, TileSpec } from '../tiling/types';
+import type { FloorInput, Piece, RoomCm } from '../tiling/types';
 import { usePanZoom, type View } from '../ui/usePanZoom';
 import PlanSvg from './PlanSvg';
 import { FitButton, MagnetButton } from '../ui/CanvasButtons';
@@ -27,10 +27,11 @@ export const TOOL_HINT: Record<MontarTool, string> = {
 };
 
 interface Props {
-  result: LayoutResult;
+  /** Peças de todos os pisos (cada uma com `floorId`). */
+  result: { pieces: Piece[] };
   rooms: RoomCm[];
-  tile: TileSpec;
-  layout: LayoutSpec;
+  /** Pisos com a peça, o layout e os cômodos de cada um. */
+  floors: FloorInput[];
   tool: MontarTool;
   /** Planta original em cm, desenhada por cima das peças para mostrar os móveis. */
   furniture: { url: string; w: number; h: number } | null;
@@ -62,7 +63,9 @@ type Drag =
   | null;
 
 export default function Plan2D(props: Props) {
-  const { result, rooms, tile, layout, tool, furniture, selected, onSelect } = props;
+  const { result, rooms, floors, tool, furniture, selected, onSelect } = props;
+  /** Piso da peça (a direção das fileiras e o rejunte dependem dele). */
+  const floorOf = (piece?: Piece) => floors.find((f) => f.id === piece?.floorId) ?? floors[0];
   const ref = useRef<HTMLDivElement>(null);
   const bounds = useMemo(() => bbox(rooms.map((r) => r.ring)), [rooms]);
   const { view, setView, toWorld, fit } = usePanZoom(ref, bounds.w + 2 * MARGIN, bounds.h + 2 * MARGIN);
@@ -77,23 +80,25 @@ export default function Plan2D(props: Props) {
     const w = toWorld(e.clientX, e.clientY);
     return { x: w.x + ox, y: w.y + oy };
   };
-  const vertical = layout.rotationDeg === 90;
-  const along = (d: Point) => (vertical ? d.y : d.x);
+  const isVertical = (piece?: Piece) => floorOf(piece).layout.rotationDeg === 90;
+  const along = (d: Point, piece?: Piece) => (isVertical(piece) ? d.y : d.x);
 
   const k = view.k;
   /** Alcance do ímã em cm no zoom atual; zero quando está livre (Shift ou Ímã desligado). */
   const snapTol = (e: { shiftKey: boolean }) => (e.shiftKey || !magnet ? 0 : SNAP_PX / k);
-  const tileScreen = Math.min(tile.lengthCm, tile.widthCm) * k;
+  const tileScreen = Math.min(...floors.map((f) => Math.min(f.tile.lengthCm, f.tile.widthCm))) * k;
   const showNumbers = tileScreen >= 24;
   const showCuts = tileScreen >= 52;
   const fontSize = 11.5 / k;
   const entrances = useMemo(
     () =>
-      entrancePoints(layout, rooms).flatMap((p) => {
-        const piece = entrancePiece(result, p);
-        return piece ? [{ piece }] : [];
-      }),
-    [layout, rooms, result],
+      floors.flatMap((f) =>
+        entrancePoints(f.layout, f.rooms).flatMap((p) => {
+          const piece = entrancePiece({ pieces: result.pieces.filter((q) => q.floorId === f.id) }, p);
+          return piece ? [{ piece }] : [];
+        }),
+      ),
+    [floors, result],
   );
   const pieceByKey = useMemo(() => new Map(result.pieces.map((p) => [p.key, p])), [result]);
   const sel = selected ? pieceByKey.get(selected) : undefined;
@@ -103,18 +108,20 @@ export default function Plan2D(props: Props) {
    * de quando solta). Null se a fileira não for uma faixa reta (aí ela segue o mouse).
    */
   const slotShift = (piece: Piece, mouseAlong: number): number | null => {
+    const vertical = isVertical(piece);
+    const { joint } = pitch(floorOf(piece).tile);
     const span = (p: Piece) => {
       const b = bbox(p.shape);
       return vertical ? { start: b.y, len: b.h } : { start: b.x, len: b.w };
     };
     const row = result.pieces.filter((p) => p.roomId === piece.roomId && p.row === piece.row).sort((a, b) => span(a).start - span(b).start);
     const frameRow = vertical ? row.map((p) => ({ ...p, shape: p.shape.map(swapXY) })) : row;
-    if (!rowIsStrip(frameRow, pitch(tile).joint)) return null;
+    if (!rowIsStrip(frameRow, joint)) return null;
     const moving = row.findIndex((p) => p.key === piece.key);
     if (moving < 0) return null;
     const spans = row.map(span);
     const others = spans.filter((_, i) => i !== moving).map((s) => s.start + s.len / 2);
-    return slotStart(spans, moving, targetIndex(others, mouseAlong), pitch(tile).joint) - spans[moving].start;
+    return slotStart(spans, moving, targetIndex(others, mouseAlong), joint) - spans[moving].start;
   };
 
   const pieceUnder = (target: EventTarget) => {
@@ -148,7 +155,7 @@ export default function Plan2D(props: Props) {
     setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     const tol = snapTol(e);
     if (drag.kind === 'floor') props.onFloorDrag(delta, false, drag.piece, tol);
-    if (drag.kind === 'row' && drag.piece) props.onRowDrag(drag.piece, along(delta), false, tol);
+    if (drag.kind === 'row' && drag.piece) props.onRowDrag(drag.piece, along(delta, drag.piece), false, tol);
   };
 
   const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
@@ -167,8 +174,8 @@ export default function Plan2D(props: Props) {
       return;
     }
     if (d.kind === 'floor') props.onFloorDrag(d.delta, true, d.piece, snapTol(e));
-    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta), true, snapTol(e));
-    if (d.kind === 'piece' && d.piece) props.onPieceDrop(d.piece, along(toCm(e)));
+    if (d.kind === 'row' && d.piece) props.onRowDrag(d.piece, along(d.delta, d.piece), true, snapTol(e));
+    if (d.kind === 'piece' && d.piece) props.onPieceDrop(d.piece, along(toCm(e), d.piece));
   };
 
   const onPointerCancel = () => {
@@ -179,8 +186,9 @@ export default function Plan2D(props: Props) {
   };
 
   const ghost = drag && drag.kind === 'piece' && drag.moved && drag.piece ? drag : null;
-  const ghostAlong = ghost ? (ghost.free ? along(ghost.delta) : (slotShift(ghost.piece!, along(ghost.startCm) + along(ghost.delta)) ?? along(ghost.delta))) : 0;
-  const ghostShift = ghost ? (vertical ? { x: 0, y: ghostAlong } : { x: ghostAlong, y: 0 }) : null;
+  const gp = ghost?.piece;
+  const ghostAlong = ghost ? (ghost.free ? along(ghost.delta, gp) : (slotShift(gp!, along(ghost.startCm, gp) + along(ghost.delta, gp)) ?? along(ghost.delta, gp))) : 0;
+  const ghostShift = ghost ? (isVertical(gp) ? { x: 0, y: ghostAlong } : { x: ghostAlong, y: 0 }) : null;
   const cursor =
     drag?.kind === 'pan' && drag.moved
       ? 'grabbing'
@@ -189,7 +197,7 @@ export default function Plan2D(props: Props) {
         : tool === 'floor'
           ? 'move'
           : tool === 'row'
-            ? vertical
+            ? isVertical()
               ? 'ns-resize'
               : 'ew-resize'
             : 'grab';

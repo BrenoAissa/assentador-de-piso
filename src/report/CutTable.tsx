@@ -1,22 +1,51 @@
-import type { LayoutResult, RoomCm } from '../tiling/types';
+import type { Piece, ProjectLayout, RoomCm } from '../tiling/types';
 import { CUT_TYPE_LABEL, cutLabel } from '../ui/format';
 
 interface Props {
-  result: LayoutResult;
+  layout: ProjectLayout;
+  /** Nome de cada piso; com um piso só, a lista fica sem título. */
+  floorNames: Record<string, string>;
   rooms: RoomCm[];
   selected?: string | null;
   onSelect?: (key: string) => void;
 }
 
-export default function CutTable({ result, rooms, selected, onSelect }: Props) {
+/** Lista de recortes, uma seção por piso (cada piso é cortado com a sua peça). */
+export default function CutTable({ layout, floorNames, rooms, selected, onSelect }: Props) {
   const names = new Map(rooms.map((r) => [r.id, r.name]));
-  const cuts = result.pieces.filter((p) => p.kind !== 'full' && !p.removed);
+  const many = layout.floors.length > 1;
+  return (
+    <>
+      {layout.floors.map(({ floorId, result }) => (
+        <section key={floorId} className="cut-section">
+          {many && <h3>{floorNames[floorId]}</h3>}
+          <FloorCuts pieces={layout.pieces.filter((p) => p.floorId === floorId)} full={result.summary.full} names={names} selected={selected} onSelect={onSelect} />
+        </section>
+      ))}
+    </>
+  );
+}
+
+function FloorCuts({
+  pieces,
+  full,
+  names,
+  selected,
+  onSelect,
+}: {
+  pieces: Piece[];
+  full: number;
+  names: Map<string, string>;
+  selected?: string | null;
+  onSelect?: (key: string) => void;
+}) {
+  const cuts = pieces.filter((p) => p.kind !== 'full' && !p.removed);
   if (cuts.length === 0) return <p className="muted">Nenhum recorte: todas as peças entram inteiras.</p>;
 
   return (
     <table className="cut-table">
       <caption className="muted">
-        {cuts.length} recortes. As {result.summary.full} peças inteiras não aparecem na lista.
+        {cuts.length} recortes. As {full} peças inteiras não aparecem na lista.
       </caption>
       <thead>
         <tr>

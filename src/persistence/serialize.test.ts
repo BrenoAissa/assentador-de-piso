@@ -34,6 +34,17 @@ describe('serializeProject / parseProject', () => {
     expect((await parseProject(antigo)).project).toEqual(emptyProject());
   });
 
+  it('arquivo antigo, de antes dos pisos, abre com um piso igual ao que tinha', async () => {
+    const velho = emptyProject() as unknown as Record<string, unknown>;
+    const tile = { lengthCm: 83, widthCm: 83, jointMm: 2, piecesPerBox: 2, wastePct: 10 };
+    const { floors, ...semPisos } = velho;
+    void floors;
+    const arquivo = JSON.stringify({ app: 'paginador-piso', project: { ...semPisos, tile, layout: emptyProject().floors[0].layout }, image: null });
+    const back = await parseProject(arquivo);
+    expect(back.project.floors).toHaveLength(1);
+    expect(back.project.floors[0].tile).toEqual(tile);
+  });
+
   it('arquivo que não é projeto gera erro claro', async () => {
     await expect(parseProject('{"foo": 1}')).rejects.toThrow('Arquivo de projeto inválido');
     await expect(parseProject('não é json')).rejects.toThrow('Arquivo de projeto inválido');

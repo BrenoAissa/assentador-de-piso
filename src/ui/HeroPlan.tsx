@@ -21,7 +21,8 @@ export default function HeroPlan() {
     const project = sampleProject();
     const rooms = roomsInCm(project);
     const origins = Object.fromEntries(rooms.map((r) => [r.id, SAMPLE_ORIGIN]));
-    return { project, rooms, result: computeLayout(rooms, project.tile, project.layout, origins) };
+    const { tile, layout } = project.floors[0];
+    return { project, rooms, result: computeLayout(rooms, tile, layout, origins) };
   }, []);
 
   const all = project.rooms.map((r) => r.polygonPx);

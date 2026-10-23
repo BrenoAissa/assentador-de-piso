@@ -47,7 +47,7 @@ export function canAdvance(project: Project, step: Step): { ok: boolean; reason?
     }
   }
   if (step === 3) {
-    const errors = validateTile(project.tile, project.layout);
+    const errors = validateTile(project.floors[0].tile, project.floors[0].layout);
     if (errors.length > 0) return { ok: false, reason: errors[0] };
   }
   return { ok: true };

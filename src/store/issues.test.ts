@@ -80,7 +80,7 @@ describe('canAdvance', () => {
 
   it('passo 3 com peça inválida não avança', () => {
     const p = emptyProject();
-    p.tile.lengthCm = 0;
+    p.floors[0].tile.lengthCm = 0;
     expect(canAdvance(p, 3)).toEqual({ ok: false, reason: 'Informe o comprimento e a largura da peça.' });
   });
 

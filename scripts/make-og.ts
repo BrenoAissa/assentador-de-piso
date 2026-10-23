@@ -86,7 +86,8 @@ function og() {
   // planta de exemplo com o piso
   const project = sampleProject();
   const rooms = roomsInCm(project);
-  const result = computeLayout(rooms, project.tile, project.layout, Object.fromEntries(rooms.map((r) => [r.id, SAMPLE_ORIGIN])));
+  const { tile, layout } = project.floors[0];
+  const result = computeLayout(rooms, tile, layout, Object.fromEntries(rooms.map((r) => [r.id, SAMPLE_ORIGIN])));
   const b = bbox(project.rooms.map((r) => r.polygonPx));
   const k = 0.6;
   const ox = 1140 - b.w * k - b.x * k;

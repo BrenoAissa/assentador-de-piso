@@ -12,7 +12,7 @@ describe('lar de exemplo', () => {
 
   it('o começo fixo da tela inicial é o mesmo que o app escolhe sozinho', () => {
     const p = sampleProject();
-    const r = solveLayout(roomsInCm(p), p.tile, p.layout);
+    const r = solveLayout(roomsInCm(p), p.floors[0].tile, p.floors[0].layout);
     expect(r.originUsed).toEqual(SAMPLE_ORIGIN);
     expect(r.summary.slivers).toBe(0);
   });

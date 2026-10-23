@@ -44,7 +44,10 @@ export async function parseProject(json: string): Promise<{ project: Project; im
     throw new Error('Arquivo de projeto inválido.');
   }
   const p = file?.project;
-  if (![APP_ID, ...OLD_APP_IDS].includes(file?.app) || p?.version !== 1 || !Array.isArray(p.rooms) || !p.tile || !p.layout) {
+  // antes dos pisos o projeto tinha `tile` e `layout`; normalizeProject transforma no primeiro piso
+  const old = p as unknown as { tile?: unknown; layout?: unknown } | undefined;
+  const hasTile = (Array.isArray(p?.floors) && p.floors.length > 0) || (!!old?.tile && !!old?.layout);
+  if (![APP_ID, ...OLD_APP_IDS].includes(file?.app) || p?.version !== 1 || !Array.isArray(p.rooms) || !hasTile) {
     throw new Error('Arquivo de projeto inválido.');
   }
   return { project: normalizeProject(p), image: file.image ? base64ToBlob(file.image.base64, file.image.type) : null };

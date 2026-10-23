@@ -1,5 +1,6 @@
+import { FIRST_FLOOR_ID, newFloor } from './floors';
 import type { Point, Ring } from './geometry/types';
-import { DEFAULT_LAYOUT, DEFAULT_TILE, NO_EDITS, type LayoutSpec, type ManualEdits, type TileSpec } from './tiling/types';
+import { NO_EDITS, type LayoutSpec, type ManualEdits, type TileSpec } from './tiling/types';
 
 export type { LayoutSpec, ManualEdits, TileSpec };
 
@@ -36,6 +37,16 @@ export interface Room {
   origin?: Point;
   /** Peça da entrada no modo por cômodo (ponto tocado, em cm). */
   start?: Point;
+  /** Piso que o cômodo recebe; ausente (ou de um piso apagado) = o primeiro piso. */
+  floorId?: string;
+}
+
+/** Um piso do projeto: a peça e como ela é assentada. Cada piso é uma compra separada. */
+export interface Floor {
+  id: string;
+  name: string;
+  tile: TileSpec;
+  layout: LayoutSpec;
 }
 
 export interface Project {
@@ -43,8 +54,8 @@ export interface Project {
   plan: PlanImage | null;
   scale: Scale | null;
   rooms: Room[];
-  tile: TileSpec;
-  layout: LayoutSpec;
+  /** Pisos do projeto, sempre pelo menos um. */
+  floors: Floor[];
   /** Ajustes manuais de fileiras e peças sobre a grade atual. */
   edits: ManualEdits;
 }
@@ -59,9 +70,14 @@ export function drawnPlan(): { plan: PlanImage; scale: Scale } {
   };
 }
 
-/** Projetos salvos antes dos ajustes manuais não têm `edits`. */
+/**
+ * Completa projetos salvos por versões anteriores: sem `edits` (antes dos ajustes manuais) ou
+ * com uma peça e um layout só (antes dos pisos), que viram o primeiro piso.
+ */
 export function normalizeProject(p: Project): Project {
-  return { ...p, edits: p.edits ?? NO_EDITS };
+  const { tile, layout, ...rest } = p as Project & { tile?: TileSpec; layout?: LayoutSpec };
+  const floors = rest.floors?.length ? rest.floors : [newFloor(FIRST_FLOOR_ID, tile, layout)];
+  return { ...rest, floors, edits: rest.edits ?? NO_EDITS };
 }
 
 export function emptyProject(): Project {
@@ -70,8 +86,7 @@ export function emptyProject(): Project {
     plan: null,
     scale: null,
     rooms: [],
-    tile: { ...DEFAULT_TILE },
-    layout: { ...DEFAULT_LAYOUT },
+    floors: [newFloor(FIRST_FLOOR_ID)],
     edits: NO_EDITS,
   };
 }

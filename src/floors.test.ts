@@ -114,6 +114,12 @@ describe('mudanças por piso', () => {
     expect(p.edits.removed).toEqual(['a:0:0']);
   });
 
+  it('mudar a compra (peças por caixa, m² por caixa, folga) não desfaz os ajustes do piso', () => {
+    expect(withFloorTile(base(), 'piso-2', { piecesPerBox: 6 }).edits).toEqual(base().edits);
+    expect(withFloorTile(base(), 'piso-2', { m2PerBox: 1.44, wastePct: 15 }).edits).toEqual(base().edits);
+    expect(withFloorTile(base(), 'piso-2', { jointMm: 3 }).edits.rowShift).toEqual({ 'a:0': 4 });
+  });
+
   it('o nome automático acompanha a peça; o nome dado pela pessoa fica', () => {
     expect(withFloorTile(base(), 'piso-2', { lengthCm: 90, widthCm: 90 }).floors[1].name).toBe('Piso 90 × 90 cm');
     const renomeado = base();

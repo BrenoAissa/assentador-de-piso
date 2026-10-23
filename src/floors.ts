@@ -34,7 +34,10 @@ export function floorRoomIds(project: Project, floorId: string): Set<string> {
 
 const mapFloor = (p: Project, id: string, fn: (f: Floor) => Floor): Floor[] => p.floors.map((f) => (f.id === id ? fn(f) : f));
 
-/** Muda a peça de um piso; a grade dele muda, então os ajustes manuais dos cômodos dele saem. */
+/** Campos da peça que mudam a grade; compra (caixa, folga) não mexe nas peças. */
+const GRID_TILE_FIELDS: (keyof TileSpec)[] = ['lengthCm', 'widthCm', 'jointMm'];
+
+/** Muda a peça de um piso; se a grade mudar, os ajustes manuais dos cômodos dele saem. */
 export function withFloorTile(p: Project, floorId: string, patch: Partial<TileSpec>): Project {
   return {
     ...p,
@@ -43,7 +46,7 @@ export function withFloorTile(p: Project, floorId: string, patch: Partial<TileSp
       // nome automático acompanha a peça; nome dado pela pessoa fica
       return { ...f, tile, name: f.name === floorName(f.tile) ? floorName(tile) : f.name };
     }),
-    edits: dropRoomEdits(p.edits, floorRoomIds(p, floorId)),
+    edits: GRID_TILE_FIELDS.some((k) => k in patch) ? dropRoomEdits(p.edits, floorRoomIds(p, floorId)) : p.edits,
   };
 }
 

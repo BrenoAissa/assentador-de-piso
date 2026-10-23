@@ -24,9 +24,12 @@ escala de 2 px/cm, sem cotas escritas: calibre com a parede externa de 10 m).
    paredes, cômodos, nomes e, se houver cotas como `3,20 x 4,50` ou `12,5 m²`, a escala.
 2. **Cômodos**: confira os contornos. Desenhe paredes digitando os cm, crie cômodos
    retangulares, arraste pontos e cômodos (com ímã de cantos, paredes e guias; segure
-   Shift ou desligue o botão Ímã para mexer livre) e marque quais recebem este piso.
+   Shift ou desligue o botão Ímã para mexer livre) e marque quais recebem piso. Sala e cozinha
+   integradas podem ser separadas com "Dividir cômodo", numa linha reta onde o piso muda.
 3. **Piso**: medidas da peça (placa ou régua), rejunte, encaixe (alinhado, tijolinho ou
-   escada), deitada ou em pé, e caixas.
+   escada), deitada ou em pé, e caixas. Com "+ Outro piso", cada cômodo pode ter o seu piso
+   (por exemplo, porcelanato de 85 na cozinha e de 83 no resto); cada piso é calculado e
+   comprado separado.
 4. **Resultado**: monte do seu jeito. Escolha por onde começar (por exemplo a porta de
    entrada), arraste o piso, deslize fileiras (elas grudam nas paredes e nas juntas das
    vizinhas), troque peças de lugar, apague peças ou marque as que ficam embaixo de móvel.
